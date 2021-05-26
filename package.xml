@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>gesture_recognition_nuitrack</name>
+  <version>0.0.0</version>
+  <description>The gesture_recognition_nuitrack package</description>
+
+  <maintainer email="davideferr@unimore.it">davide</maintainer>
+
+  <license>BSD-3</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <depend>roscpp</depend>
+  <depend>rospy</depend>
+  <depend>roslib</depend>
+
+  <build_depend>message_generation</build_depend>
+  <exec_depend>message_runtime</exec_depend>
+
+  <depend>std_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>nuitrack_msgs</depend>
+  <depend>visualization_msgs</depend>
+
+  <depend>std_srvs</depend>
+
+  <depend>cv_bridge</depend>
+  <depend>image_transport</depend>
+
+</package>

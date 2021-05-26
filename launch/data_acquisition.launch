@@ -1,0 +1,13 @@
+<launch>
+
+  <!--	Arguments	 -->
+  <arg name="live_mode" default="false" />
+  <!-- <arg name="save_file_name" default="new_save" /> -->
+
+	<!--	Node	-->
+	<node pkg="gesture_recognition" type="data_acquisition_Node" name="data_acquisition_Node" output="screen">
+    <param name="live_mode" value="$(arg live_mode)"/>
+    <!-- <param name="save_file_name" value="$(arg save_file_name)"/> -->
+  </node>
+
+</launch>

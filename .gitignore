@@ -1,0 +1,5 @@
+# Ignore Rosbag Files
+rosbag/*
+
+# Ignore Dataset Files
+dataset/*
