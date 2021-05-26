@@ -5,7 +5,7 @@
 data_acquisition::data_acquisition() {
 
      // ---- LOAD PARAMETERS ---- //
-    if (!nh.param<bool>("/data_acquisition_Node/live_mode", live_mode, false)) {ROS_ERROR("Couldn't retrieve the Live Mode Parameter value.");}
+    // if (!nh.param<bool>("/data_acquisition_Node/live_mode", live_mode, false)) {ROS_ERROR("Couldn't retrieve the Live Mode Parameter value.");}
     // if (!nh.param<std::string>("/data_acquisition_Node/save_file_name", save_file_name, "new_save")) {ROS_ERROR("Couldn't retrieve the csv Save File Name.");}
   
     // ---- ROS SERVICES ---- //
@@ -32,7 +32,6 @@ bool data_acquisition::Start_Registration_Service_Callback (gesture_recognition:
     // ---- INITIALIZE ROS SUBSCRIBERS ---- //
     image_raw_subscriber            = nh.subscribe("/nuitrack/rgb/image_raw", 1,        &data_acquisition::image_raw_Callback, this);
     skeleton_data_subscriber        = nh.subscribe("/nuitrack/skeletons", 1,            &data_acquisition::skeleton_data_Callback, this);
-    visualization_marker_subscriber = nh.subscribe("/nuitrack/viz_skeleton_markers", 1, &data_acquisition::skeleton_marker_Callback, this);
 
     // ---- OFSTREAM CREATION ---- //
     ofstream_creation (save_file_name);
@@ -51,7 +50,6 @@ bool data_acquisition::Stop_Registration_Service_Callback (std_srvs::TriggerRequ
     // Close OfStreams
     image_raw_save.close();
     skeleton_data_save.close();
-    skeleton_marker_save.close();
 
     ROS_WARN("Data Saved Succesfully");
 
@@ -63,8 +61,7 @@ bool data_acquisition::Stop_Registration_Service_Callback (std_srvs::TriggerRequ
 
 void data_acquisition::image_raw_Callback (const sensor_msgs::Image::ConstPtr &msg) {
 
-    sensor_msgs::Image image_raw = *msg;
-    image_temp = image_raw;
+    image_raw = *msg;
 
     // Change from "rgb8" to "bgr8"
     // if (image_raw.encoding == "bgr8") {image_raw.encoding == "rgb8";}
@@ -118,8 +115,7 @@ void data_acquisition::image_raw_Callback (const sensor_msgs::Image::ConstPtr &m
     image_raw_save << "\n";
 
     // Show Image Raw
-    cv_bridge::CvImagePtr img;
-    img = cv_bridge::toCvCopy(image_raw, image_raw.encoding);
+    cv_bridge::CvImagePtr img = cv_bridge::toCvCopy(image_raw, image_raw.encoding);
     cv::imshow("my display",img->image);
     cv::waitKey(1);
 
@@ -190,23 +186,8 @@ void data_acquisition::skeleton_data_Callback (const nuitrack_msgs::SkeletonData
 
     ROS_INFO_STREAM_THROTTLE(5, "Saving Skeleton Data...");
 
-}
-
-void data_acquisition::skeleton_marker_Callback (const visualization_msgs::MarkerArray::ConstPtr &msg) {
-
-    visualization_msgs::MarkerArray skeleton_marker = *msg;
-
-    cv_bridge::CvImagePtr img;
-    img = cv_bridge::toCvCopy(image_temp, image_temp.encoding);
-    cv::Mat img_mat =  img->image;
-    cv::circle(img_mat, cv::Point(1,1), 1, (0, 0, 255), 10);
-    cv::circle(img_mat, cv::Point(10,10), 10, (0, 0, 255), 10);
-    cv::circle(img_mat, cv::Point(1920,1080), 100, (0, 0, 255), 100);
-
-    cv::imshow("skeleton marker",img_mat);
-    cv::waitKey(1);
-
-    // skeleton_marker_save << "Time Stamp,Time Stamp,Data\n\n";
+    // Draw Skeleton On Image Raw
+    draw_skeleton (skeleton_data.skeletons[0], image_raw);
 
 }
 
@@ -222,19 +203,33 @@ void data_acquisition::ofstream_creation (std::string ofstream_name) {
 
     std::string image_raw_save_file         = package_path + "/dataset/data_acquisition/" + ofstream_name + "_image_raw.csv";
     std::string skeleton_data_save_file     = package_path + "/dataset/data_acquisition/" + ofstream_name + "_skeleton_data.csv";
-    std::string skeleton_marker_save_file   = package_path + "/dataset/data_acquisition/" + ofstream_name + "_skeleton_marker.csv";
 
     // OfStream Creation
     image_raw_save       = std::ofstream(image_raw_save_file);
     skeleton_data_save   = std::ofstream(skeleton_data_save_file);
-    skeleton_marker_save = std::ofstream(skeleton_marker_save_file);
 
     // First Row Bool Initialization
     image_raw_first_row = false;
     skeleton_data_first_row = false;
-    skeleton_marker_first_row = false;
 
-    ROS_WARN_STREAM("Output Files:  \"" << ofstream_name << "_image_raw.csv\"" << "\t\"" << ofstream_name << "_skeleton_data.csv\"" << "\t\"" << ofstream_name << "_skeleton_marker.csv\"" << std::endl);
+    ROS_WARN_STREAM("Output Files:  \"" << ofstream_name << "_image_raw.csv\"" << "\t\"" << ofstream_name << "_skeleton_data.csv\"" << std::endl);
+
+}
+
+void data_acquisition::draw_skeleton (nuitrack_msgs::SkeletonData skeleton_data, sensor_msgs::Image image) {
+
+
+    // cv_bridge::CvImagePtr img;
+    // img = cv_bridge::toCvCopy(image_temp, image_temp.encoding);
+    // cv::Mat img_mat =  img->image;
+    // cv::circle(img_mat, cv::Point(1,1), 1, (0, 0, 255), 10);
+    // cv::circle(img_mat, cv::Point(10,10), 10, (0, 0, 255), 10);
+    // cv::circle(img_mat, cv::Point(1920,1080), 100, (0, 0, 255), 100);
+
+    // cv::imshow("skeleton marker",img_mat);
+    // cv::waitKey(1);
+
+    // skeleton_marker_save << "Time Stamp,Time Stamp,Data\n\n";
 
 }
 
