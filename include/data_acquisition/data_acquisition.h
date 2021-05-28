@@ -5,13 +5,15 @@
 #include <opencv2/opencv.hpp>
 #include <cv_bridge/cv_bridge.h>
 
+#include <librealsense2/rs.hpp> 
+#include <librealsense2/rsutil.h>
+
 #include <ros/ros.h>
 #include <ros/package.h>
 
 #include "nuitrack_msgs/SkeletonDataArray.h"
 #include "nuitrack_msgs/SkeletonData.h"
 #include "gesture_recognition/String.h"
-#include <visualization_msgs/MarkerArray.h>
 #include <sensor_msgs/Image.h>
 
 #include <std_srvs/Trigger.h>
@@ -34,7 +36,11 @@ class data_acquisition {
         // bool live_mode;
         bool start_registration, shutdown_required;
         std::string save_file_name;
+        rs2_intrinsics realsense_intrinsics;
         sensor_msgs::Image image_raw;
+        nuitrack_msgs::SkeletonData skeleton;
+        nuitrack_msgs::SkeletonDataArray skeleton_array;
+
 
         // ---- OfStreams ---- //
         std::ofstream image_raw_save, skeleton_data_save;
@@ -57,6 +63,7 @@ class data_acquisition {
         // ---- FUNCTIONS ---- //
         void ofstream_creation (std::string ofstream_name);
         void draw_skeleton (nuitrack_msgs::SkeletonData skeleton_data, sensor_msgs::Image image);
+        rs2_intrinsics realsense_parameters (std::string type);
 
 };
 

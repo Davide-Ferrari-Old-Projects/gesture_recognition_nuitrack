@@ -12,13 +12,14 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   sensor_msgs
   nuitrack_msgs
-  visualization_msgs
   message_generation
   
   OpenCV
   cv_bridge
   image_transport
 )
+
+find_package(realsense2 REQUIRED)
 
 add_service_files(
    FILES
@@ -35,7 +36,9 @@ generate_messages(
 catkin_package(
   INCLUDE_DIRS
     include
-  # LIBRARIES gesture_recognition_nuitrack
+  LIBRARIES 
+    #gesture_recognition_nuitrack
+    ${realsense2_LIBRARY}
   CATKIN_DEPENDS
     roscpp
     rospy
@@ -43,7 +46,6 @@ catkin_package(
     std_msgs
     sensor_msgs
     nuitrack_msgs
-    visualization_msgs
     message_runtime
 )
 

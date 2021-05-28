@@ -20,11 +20,11 @@
   <depend>std_msgs</depend>
   <depend>sensor_msgs</depend>
   <depend>nuitrack_msgs</depend>
-  <depend>visualization_msgs</depend>
 
   <depend>std_srvs</depend>
 
   <depend>cv_bridge</depend>
   <depend>image_transport</depend>
+  <depend>realsense2</depend>
 
 </package>
