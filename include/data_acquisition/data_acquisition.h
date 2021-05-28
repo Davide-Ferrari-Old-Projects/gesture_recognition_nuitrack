@@ -36,7 +36,6 @@ class data_acquisition {
         // bool live_mode;
         bool start_registration, shutdown_required;
         std::string save_file_name;
-        rs2_intrinsics realsense_intrinsics;
         sensor_msgs::Image image_raw;
         nuitrack_msgs::SkeletonData skeleton;
         nuitrack_msgs::SkeletonDataArray skeleton_array;
@@ -63,7 +62,6 @@ class data_acquisition {
         // ---- FUNCTIONS ---- //
         void ofstream_creation (std::string ofstream_name);
         void draw_skeleton (nuitrack_msgs::SkeletonData skeleton_data, sensor_msgs::Image image);
-        rs2_intrinsics realsense_parameters (std::string type);
 
 };
 

@@ -23,9 +23,6 @@ data_acquisition::data_acquisition() {
     // First Row Bool Initialization
     image_raw_first_row = false;
     skeleton_data_first_row = false;
-
-    // Inizialize Realsense D435i Intrinsics Parameters
-    realsense_intrinsics = realsense_parameters("DEPTH");
     
 }
 
@@ -240,27 +237,14 @@ void data_acquisition::draw_skeleton (nuitrack_msgs::SkeletonData skeleton_data,
 
     for (unsigned int i = 0; i < skeleton_data.joints.size(); i++) {
 
-        float pixel[2], point[3];
-    
-        // Get Skeleton Joint Position (x,y,z) 
-        point[0] = skeleton_data.joint_pos_3D[i].x;
-        point[1] = skeleton_data.joint_pos_3D[i].y;
-        point[2] = skeleton_data.joint_pos_3D[i].z;
+        // 2D Coords (Joint position in normalized projective coordinates (x, y from 0.0 to 1.0, z is real)).
+        double normalized_coords[2] = {skeleton_data.joint_pos_2D[i].x, skeleton_data.joint_pos_2D[i].y};
 
-        // Convert Poit to Pixel
-        rs2_project_point_to_pixel(pixel, &realsense_intrinsics, point);
-    
-        // TODO: No-Sense Conversion
-        pixel[0] *= (620.0 / 720.0);
-        pixel[1] *= (480.0 / 1080.0);
-
-        ROS_INFO_STREAM_THROTTLE(5,"\nSkeleton:");
-        ROS_INFO_STREAM_THROTTLE(5,"Joint Name: " << skeleton_data.joints[0]);
-        ROS_INFO_STREAM_THROTTLE(5,"Point: \t" << point[0] << "\t" << point[1] << "\t" << point[2]);
-        ROS_INFO_STREAM_THROTTLE(5,"pixels:\t" << pixel[0] << "\t" << pixel[1]);
+        // De-Normalize in Camera Frame (image_raw 620x480)
+        double de_normalized_coords[2] = {normalized_coords[0] * 620, normalized_coords[1] * 480};
 
         // Drow Skeleton Joint Positions
-        cv::circle(img_mat, cv::Point(pixel[0],pixel[1]), 1, (0, 0, 255), 10);
+        cv::circle(img_mat, cv::Point(de_normalized_coords[0],de_normalized_coords[1]), 1, (0, 0, 255), 10);
 
     }
 
@@ -272,131 +256,6 @@ void data_acquisition::draw_skeleton (nuitrack_msgs::SkeletonData skeleton_data,
     cv::waitKey(10);
 
 }
-
-rs2_intrinsics data_acquisition::realsense_parameters (std::string type) { // COLOR or DEPTH
-
-    // Create RealSense Intrinsic Parameters
-    rs2_intrinsics realsense_d435i_intrinsics;
-
-    if (type == "COLOR") {
-
-        // RealSense D435i Camera Info (COLOR)
-        int width = 1280, height = 720;
-        std::string distortion_model = "plumb_bob";
-        float D[5] = {0.0, 0.0, 0.0, 0.0, 0.0};
-        float K[9] = {914.9129638671875, 0.0, 646.0457763671875, 0.0, 912.9351196289062, 369.348388671875, 0.0, 0.0, 1.0};
-        float R[9] = {1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0};
-        float P[12] = {914.9129638671875, 0.0, 646.0457763671875, 0.0, 0.0, 912.9351196289062, 369.348388671875, 0.0, 0.0, 0.0, 1.0, 0.0};
-        int binning_x = 0;
-        int binning_y = 0;
-        
-        int roi_x_offset = 0;
-        int roi_y_offset = 0;
-        int roi_height = 0;
-        int roi_width = 0;
-        bool roi_do_rectify = false;
-
-        /********************************************************************************************************************************************
-         *                                                                                                                                          *
-         *   header:                                                                                                                                *
-         *   seq: 8425                                                                                                                              *
-         *   stamp:                                                                                                                                 *
-         *       secs: 1622037279                                                                                                                   *
-         *       nsecs: 636879921                                                                                                                   *
-         *   frame_id: "camera_color_optical_frame"                                                                                                 *
-         *   height: 720                                                                                                                            *
-         *   width: 1280                                                                                                                            *   
-         *   distortion_model: "plumb_bob"                                                                                                          *
-         *   D: [0.0, 0.0, 0.0, 0.0, 0.0]                                                                                                           *
-         *   K: [914.9129638671875, 0.0, 646.0457763671875, 0.0, 912.9351196289062, 369.348388671875, 0.0, 0.0, 1.0]                                *
-         *   R: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]                                                                                       *
-         *   P: [914.9129638671875, 0.0, 646.0457763671875, 0.0, 0.0, 912.9351196289062, 369.348388671875, 0.0, 0.0, 0.0, 1.0, 0.0]                 *
-         *   binning_x: 0                                                                                                                           *   
-         *   binning_y: 0                                                                                                                           *   
-         *   roi:                                                                                                                                   *    
-         *      x_offset: 0                                                                                                                         *   
-         *      y_offset: 0                                                                                                                         *   
-         *      height: 0                                                                                                                           *   
-         *      width: 0                                                                                                                            *   
-         *      do_rectify: False                                                                                                                   *   
-         *                                                                                                                                          *
-         *******************************************************************************************************************************************/
-
-        realsense_d435i_intrinsics.width = width;
-        realsense_d435i_intrinsics.height = height;
-
-        realsense_d435i_intrinsics.ppx = K[2];
-        realsense_d435i_intrinsics.ppy = K[5];
-        realsense_d435i_intrinsics.fx = K[0];
-        realsense_d435i_intrinsics.fy = K[4];
-
-        if (distortion_model == "plumb_bob") {realsense_d435i_intrinsics.model = RS2_DISTORTION_BROWN_CONRADY;}
-        else if  (distortion_model == "equidistant") {realsense_d435i_intrinsics.model = RS2_DISTORTION_KANNALA_BRANDT4;}
-        for (int i = 0; i < 5; i++) {realsense_d435i_intrinsics.coeffs[i] = D[i];}
-
-    } else if (type == "DEPTH") {
-        
-        // RealSense D435i Camera Info (DEPTH)
-        int width = 848, height = 480;
-        std::string distortion_model = "plumb_bob";
-        float D[5] = {0.0, 0.0, 0.0, 0.0, 0.0};
-        float K[9] = {423.06988525390625, 0.0, 420.19415283203125, 0.0, 423.06988525390625, 238.3802032470703, 0.0, 0.0, 1.0};
-        float R[9] = {1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0};
-        float P[12] = {423.06988525390625, 0.0, 420.19415283203125, 0.0, 0.0, 423.06988525390625, 238.3802032470703, 0.0, 0.0, 0.0, 1.0, 0.0};
-        int binning_x = 0;
-        int binning_y = 0;
-        
-        int roi_x_offset = 0;
-        int roi_y_offset = 0;
-        int roi_height = 0;
-        int roi_width = 0;
-        bool roi_do_rectify = false;
-
-        /********************************************************************************************************************************************
-         *                                                                                                                                          *
-         *   header:                                                                                                                                *
-         *   seq: 2                                                                                                                                 *
-         *   stamp:                                                                                                                                 *
-         *       secs: 1622037263                                                                                                                   *
-         *       nsecs:   3570557                                                                                                                   *
-         *   frame_id: "camera_depth_optical_frame"                                                                                                 *
-         *   height: 480                                                                                                                            *
-         *   width: 848                                                                                                                             *
-         *   distortion_model: "plumb_bob"                                                                                                          *
-         *   D: [0.0, 0.0, 0.0, 0.0, 0.0]                                                                                                           *
-         *   K: [423.06988525390625, 0.0, 420.19415283203125, 0.0, 423.06988525390625, 238.3802032470703, 0.0, 0.0, 1.0]                            *
-         *   R: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]                                                                                       *
-         *   P: [423.06988525390625, 0.0, 420.19415283203125, 0.0, 0.0, 423.06988525390625, 238.3802032470703, 0.0, 0.0, 0.0, 1.0, 0.0]             *
-         *   binning_x: 0                                                                                                                           *
-         *   binning_y: 0                                                                                                                           *
-         *   roi:                                                                                                                                   *
-         *      x_offset: 0                                                                                                                         *
-         *      y_offset: 0                                                                                                                         *
-         *      height: 0                                                                                                                           *
-         *      width: 0                                                                                                                            *
-         *      do_rectify: False                                                                                                                   *   
-         *                                                                                                                                          *
-         *******************************************************************************************************************************************/
-
-        realsense_d435i_intrinsics.width = width;
-        realsense_d435i_intrinsics.height = height;
-
-        realsense_d435i_intrinsics.ppx = K[2];
-        realsense_d435i_intrinsics.ppy = K[5];
-        realsense_d435i_intrinsics.fx = K[0];
-        realsense_d435i_intrinsics.fy = K[4];
-
-        if (distortion_model == "plumb_bob") {realsense_d435i_intrinsics.model = RS2_DISTORTION_BROWN_CONRADY;}
-        else if  (distortion_model == "equidistant") {realsense_d435i_intrinsics.model = RS2_DISTORTION_KANNALA_BRANDT4;}
-        for (int i = 0; i < 5; i++) {realsense_d435i_intrinsics.coeffs[i] = D[i];}
-    
-    }
-
-    return realsense_d435i_intrinsics;
-
-}
-
-
 
 //-------------------------------------------------------- MAIN --------------------------------------------------------//
 
