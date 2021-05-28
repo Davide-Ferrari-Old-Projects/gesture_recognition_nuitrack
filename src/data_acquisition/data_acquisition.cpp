@@ -40,6 +40,9 @@ bool data_acquisition::Start_Registration_Service_Callback (gesture_recognition:
     // ---- OFSTREAM CREATION ---- //
     ofstream_creation (save_file_name);
     
+    // sleep 2 seconds
+    ros::Duration(2).sleep();
+    
     res.success = true;
     return true;
 
@@ -134,8 +137,8 @@ void data_acquisition::image_raw_Callback (const sensor_msgs::Image::ConstPtr &m
 void data_acquisition::skeleton_data_Callback (const nuitrack_msgs::SkeletonDataArray::ConstPtr &msg) {
 
     nuitrack_msgs::SkeletonDataArray skeleton_data = *msg;
-    skeleton = skeleton_data.skeletons[0];
-    skeleton_array = skeleton_data;
+
+    if (skeleton_data.skeletons.size() > 0) {skeleton = skeleton_data.skeletons[0];}
 
     /********************************************************************************************
      *                              nuitrack_msgs::SkeletonDataArray                            *
@@ -147,7 +150,7 @@ void data_acquisition::skeleton_data_Callback (const nuitrack_msgs::SkeletonData
      *                                                                                          *
      *  nuitrack_msgs::SkeletonData[] skeletons                                                 *
      *      uint16 id                           # user id                                       *
-     *      string[] joints                     # joint names                                   *
+     *      string[] joint_names                     # joint names                                   *
      *      geometry_msgs/Point[] joint_pos_3D     # joint cartesian positions                     *
      *                                                                                          *
      *******************************************************************************************/
@@ -158,13 +161,13 @@ void data_acquisition::skeleton_data_Callback (const nuitrack_msgs::SkeletonData
         skeleton_data_save << "Timestamp,Timestamp,Header,Header, ,user id, ,";
 
         // ... Joint Names (x3 each joint) ...
-        for (unsigned i = 0; i < skeleton_data.skeletons[0].joints.size(); i++) {skeleton_data_save << skeleton_data.skeletons[0].joints[i] << "," << skeleton_data.skeletons[0].joints[i] << "," << skeleton_data.skeletons[0].joints[i] << ",";}
+        for (unsigned i = 0; i < skeleton_data.skeletons[0].joint_names.size(); i++) {skeleton_data_save << skeleton_data.skeletons[0].joint_names[i] << "," << skeleton_data.skeletons[0].joint_names[i] << "," << skeleton_data.skeletons[0].joint_names[i] << ",";}
 
-        // Second Row: sec, nsec, frame id, seq, x,y,z (x20 joints)
+        // Second Row: sec, nsec, frame id, seq, x,y,z (x20 joint_names)
         skeleton_data_save << "\nsec,nsec,frame_id,seq, , , ,";
 
-        // ... x,y,z (x20 joints) ...
-        for (unsigned i = 0; i < skeleton_data.skeletons[0].joints.size(); i++) {skeleton_data_save << "x,y,z" << ",";}
+        // ... x,y,z (x20 joint_names) ...
+        for (unsigned i = 0; i < skeleton_data.skeletons[0].joint_names.size(); i++) {skeleton_data_save << "x,y,z" << ",";}
 
         // Third Row: Empty
         skeleton_data_save << "\n\n";
@@ -176,8 +179,8 @@ void data_acquisition::skeleton_data_Callback (const nuitrack_msgs::SkeletonData
 
     if (start_registration) {
 /* 
-        // Check Skeleton Joint Size (check if all 20 joints are present)
-        if (skeleton_data.skeletons[0].joints.size() != 20) {ROS_WARN_STREAM("Warning! Skeleton Joint Size = " << skeleton_data.skeletons[0].joints.size());}
+        // Check Skeleton Joint Size (check if all 20 joints  are present)
+        if (skeleton_data.skeletons[0].joint_names.size() != 20) {ROS_WARN_STREAM("Warning! Skeleton Joint Size = " << skeleton_data.skeletons[0].joint_names.size());}
 
         // Time Stamp & Header
         skeleton_data_save << skeleton_data.header.stamp.sec << "," << skeleton_data.header.stamp.nsec << ",";
@@ -187,7 +190,7 @@ void data_acquisition::skeleton_data_Callback (const nuitrack_msgs::SkeletonData
         skeleton_data_save << skeleton_data.skeletons[0].id << ", ,";
 
         // Data (x,y,z for each joint)
-        for (unsigned int i = 0; i < skeleton_data.skeletons[0].joints.size(); i++) {
+        for (unsigned int i = 0; i < skeleton_data.skeletons[0].joint_names.size(); i++) {
             skeleton_data_save << skeleton_data.skeletons[0].joint_pos_3D[i].x << ",";
             skeleton_data_save << skeleton_data.skeletons[0].joint_pos_3D[i].y << ",";
             skeleton_data_save << skeleton_data.skeletons[0].joint_pos_3D[i].z << ",";
@@ -228,32 +231,92 @@ void data_acquisition::draw_skeleton (nuitrack_msgs::SkeletonData skeleton_data,
 
     // Create OpenCV Image Matrix
     cv_bridge::CvImagePtr img;
-    img = cv_bridge::toCvCopy(image, "bgr8");
+    img = cv_bridge::toCvCopy(image, image.encoding);
     cv::Mat img_mat =  img->image;
 
-    ROS_INFO_STREAM_THROTTLE(5,"\nImage Timestamp: " << skeleton_array.header.stamp.toSec());
-    ROS_INFO_STREAM_THROTTLE(5,"Skeleton Timestamp: " << image.header.stamp.toSec());
+    ROS_INFO_STREAM_THROTTLE(5,"\nImage Timestamp: " << skeleton_data.header.stamp);
+    ROS_INFO_STREAM_THROTTLE(5,"Skeleton Timestamp: " << image.header.stamp);
+
+    // Create Skeleton Markers Vector
+    std::vector<Skeleton_Markers> skeleton_markers;
 
 
-    for (unsigned int i = 0; i < skeleton_data.joints.size(); i++) {
+    // Draw Single Joints:
+
+    for (unsigned int i = 0; i < skeleton_data.joint_names.size(); i++) {
 
         // 2D Coords (Joint position in normalized projective coordinates (x, y from 0.0 to 1.0, z is real)).
         double normalized_coords[2] = {skeleton_data.joint_pos_2D[i].x, skeleton_data.joint_pos_2D[i].y};
 
         // De-Normalize in Camera Frame (image_raw 620x480)
-        double de_normalized_coords[2] = {normalized_coords[0] * 620, normalized_coords[1] * 480};
+        double de_normalized_coords[2] = {normalized_coords[0] * 640, normalized_coords[1] * 480};
+
+        // Save Data on Markers Vector
+        Skeleton_Markers temp;
+        temp.joint_name = skeleton_data.joint_names[i];
+        temp.joint_pose_2D[0] = de_normalized_coords[0];
+        temp.joint_pose_2D[1] = de_normalized_coords[1];
+        skeleton_markers.push_back(temp);
 
         // Drow Skeleton Joint Positions
-        cv::circle(img_mat, cv::Point(de_normalized_coords[0],de_normalized_coords[1]), 1, (0, 0, 255), 10);
+        cv::circle(img_mat, cv::Point(skeleton_markers[i].joint_pose_2D[0],skeleton_markers[i].joint_pose_2D[1]), 1, (0, 0, 255), 10);
 
     }
 
+    // Draw Skeleton Lines:
+
+    // Head, Neck, Collar (letf collar = right collar)
+    draw_skeleton_between_two_markers(HEAD, NECK, skeleton_markers, &img_mat);
+    draw_skeleton_between_two_markers(NECK, LEFT_COLLAR, skeleton_markers, &img_mat);
+
+    // Left Arm
+    draw_skeleton_between_two_markers(LEFT_COLLAR, LEFT_SHOULDER, skeleton_markers, &img_mat);
+    draw_skeleton_between_two_markers(LEFT_SHOULDER, LEFT_ELBOW, skeleton_markers, &img_mat);
+    draw_skeleton_between_two_markers(LEFT_ELBOW, LEFT_WRIST, skeleton_markers, &img_mat);
+    draw_skeleton_between_two_markers(LEFT_WRIST, LEFT_HAND, skeleton_markers, &img_mat);
+
+    // Right Arm
+    draw_skeleton_between_two_markers(RIGHT_COLLAR, RIGHT_SHOULDER, skeleton_markers, &img_mat);
+    draw_skeleton_between_two_markers(RIGHT_SHOULDER, RIGHT_ELBOW, skeleton_markers, &img_mat);
+    draw_skeleton_between_two_markers(RIGHT_ELBOW, RIGHT_WRIST, skeleton_markers, &img_mat);
+    draw_skeleton_between_two_markers(RIGHT_WRIST, RIGHT_HAND, skeleton_markers, &img_mat);
+
+    // Body
+    draw_skeleton_between_two_markers(RIGHT_COLLAR, TORSO, skeleton_markers, &img_mat);
+    draw_skeleton_between_two_markers(TORSO, WAIST, skeleton_markers, &img_mat);
+
+    // Left Leg
+    draw_skeleton_between_two_markers(WAIST, LEFT_HIP, skeleton_markers, &img_mat);
+    draw_skeleton_between_two_markers(LEFT_HIP, LEFT_KNEE, skeleton_markers, &img_mat);
+    draw_skeleton_between_two_markers(LEFT_KNEE, LEFT_ANKLE, skeleton_markers, &img_mat);
+
+    // Right Leg
+    draw_skeleton_between_two_markers(WAIST, RIGHT_HIP, skeleton_markers, &img_mat);
+    draw_skeleton_between_two_markers(RIGHT_HIP, RIGHT_KNEE, skeleton_markers, &img_mat);
+    draw_skeleton_between_two_markers(RIGHT_KNEE, RIGHT_ANKLE, skeleton_markers, &img_mat);
+
     // Drow Test Point (MAX COORDS)
-    // cv::circle(img_mat, cv::Point(620,480), 10, (255, 0, 0), 10);
+    // cv::circle(img_mat, cv::Point(640,480), 10, (255, 0, 0), 10);
 
     // Show Results
     cv::imshow("Skeleton Markers",img_mat);
     cv::waitKey(10);
+
+}
+
+void data_acquisition::draw_skeleton_between_two_markers (std::string marker1, std::string marker2, std::vector<Skeleton_Markers> skeleton, cv::Mat *img) {
+
+    cv::Point point1, point2;
+
+    for (unsigned int i = 0; i < skeleton.size(); i++) {
+        
+        // Find the Desired Marker Points
+        if (skeleton[i].joint_name == marker1) {point1 = cv::Point(skeleton[i].joint_pose_2D[0],skeleton[i].joint_pose_2D[1]);}
+        if (skeleton[i].joint_name == marker2) {point2 = cv::Point(skeleton[i].joint_pose_2D[0],skeleton[i].joint_pose_2D[1]);}
+
+    }
+
+    cv::line(*img,point1,point2,(0,0,255),5);
 
 }
 
