@@ -60,15 +60,16 @@ class data_acquisition {
         ros::NodeHandle nh;
 
         // ---- Parameters ---- //
-        // bool live_mode;
+        bool save_image_raw, save_skeleton_message, save_skeleton_pose;
         bool start_registration, shutdown_required;
         std::string save_file_name;
         sensor_msgs::Image image_raw;
         nuitrack_msgs::SkeletonData skeleton;
 
         // ---- OfStreams ---- //
-        std::ofstream image_raw_save, skeleton_data_save;
-        bool image_raw_first_row, skeleton_data_first_row;
+        std::ofstream image_raw_save, skeleton_message_save, skeleton_pose_save;
+        bool image_raw_first_row, skeleton_message_first_row, skeleton_pose_first_row;
+        bool skeleton_data_received, image_row_received;
         
         // ---- PUBLISHERS & SUBSCRIBERS ---- //
         ros::Subscriber skeleton_data_subscriber, image_raw_subscriber;

@@ -1,12 +1,16 @@
 <launch>
 
   <!--	Arguments	 -->
-  <!-- <arg name="live_mode" default="false" /> -->
+  <arg name="save_image_raw" default="false" />
+  <arg name="save_skeleton_message" default="false" />
+  <arg name="save_skeleton_pose" default="true" />
   <!-- <arg name="save_file_name" default="new_save" /> -->
 
 	<!--	Node	-->
 	<node pkg="gesture_recognition_nuitrack" type="data_acquisition_Node" name="data_acquisition_Node" output="screen">
-    <!-- <param name="live_mode" value="$(arg live_mode)"/> -->
+    <param name="save_image_raw" value="$(arg save_image_raw)"/>
+    <param name="save_skeleton_message" value="$(arg save_skeleton_message)"/>
+    <param name="save_skeleton_pose" value="$(arg save_skeleton_pose)"/>
     <!-- <param name="save_file_name" value="$(arg save_file_name)"/> -->
   </node>
 
