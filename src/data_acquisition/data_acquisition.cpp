@@ -11,8 +11,8 @@ data_acquisition::data_acquisition() {
     // if (!nh.param<std::string>("/data_acquisition_Node/save_file_name", save_file_name, "new_save")) {ROS_ERROR("Couldn't retrieve the csv Save File Name.");}
 
     // ---- ROS SUBSCRIBERS ---- //
-    image_raw_subscriber = nh.subscribe("/nuitrack/rgb/image_raw", 1, &data_acquisition::image_raw_Callback, this);
-    skeleton_data_subscriber = nh.subscribe("/nuitrack/skeletons", 1, &data_acquisition::skeleton_data_Callback, this);
+    image_raw_subscriber = nh.subscribe("/nuitrack/rgb/image_raw", 0, &data_acquisition::image_raw_Callback, this);
+    skeleton_data_subscriber = nh.subscribe("/nuitrack/skeletons", 0, &data_acquisition::skeleton_data_Callback, this);
   
     // ---- ROS SERVICES ---- //
     start_registration_service = nh.advertiseService("/data_acquisition_Node/start_registration", &data_acquisition::Start_Registration_Service_Callback, this);
@@ -21,6 +21,7 @@ data_acquisition::data_acquisition() {
     // Variable Initialization
     start_registration = false;
     shutdown_required = false;
+    queue_empty = false;
     skeleton_data_received = false;
     image_row_received = false;
 
@@ -56,15 +57,9 @@ bool data_acquisition::Start_Registration_Service_Callback (gesture_recognition:
 
 bool data_acquisition::Stop_Registration_Service_Callback (std_srvs::TriggerRequest &req, std_srvs::TriggerResponse &res) {
 
-    start_registration = false;
     shutdown_required = true;
 
-    // Close OfStreams
-    if (save_image_raw) {image_raw_save.close();}
-    if (save_skeleton_message) {skeleton_message_save.close();}
-    if (save_skeleton_pose) {skeleton_pose_save.close();}
-
-    ROS_WARN("Data Saved Succesfully");
+    ROS_WARN("\nWait For Data Saving...");
 
     res.success = true;
     return true;
@@ -76,7 +71,10 @@ void data_acquisition::image_raw_Callback (const sensor_msgs::Image::ConstPtr &m
 
     image_raw = *msg;
     image_row_received = true;
-    
+
+    // Get Message Time
+    new_message_time = ros::Time::now();    
+
     /********************************************************************************************
      *                                  sensor_msgs::Image                                      *
      *                                                                                          *
@@ -142,7 +140,18 @@ void data_acquisition::skeleton_data_Callback (const nuitrack_msgs::SkeletonData
     nuitrack_msgs::SkeletonDataArray skeleton_data = *msg;
     skeleton_data_received = true;
 
-    if (skeleton_data.skeletons.size() > 0) {skeleton = skeleton_data.skeletons[0];}
+    // Get Message Time
+    new_message_time = ros::Time::now();
+
+    if (skeleton_data.skeletons.size() > 0) {
+
+        // Skeleton Data    
+        skeleton = skeleton_data.skeletons[0];
+
+        // Header
+        skeleton.header = skeleton_data.header;
+
+    }
 
     /********************************************************************************************
      *                              nuitrack_msgs::SkeletonDataArray                            *
@@ -223,13 +232,13 @@ void data_acquisition::skeleton_data_Callback (const nuitrack_msgs::SkeletonData
     if (!skeleton_pose_first_row && save_skeleton_pose) {
 
         // First Row: Time Stamp, Header, User ID, ...
-        skeleton_pose_save << "Timestamp,Timestamp, ,";
+        skeleton_pose_save << "Timestamp,Timestamp,Header, ,";
 
         // ... Joint Names (x3 each joint) ...
         for (unsigned i = 0; i < skeleton_data.skeletons[0].joint_names.size(); i++) {skeleton_pose_save << skeleton_data.skeletons[0].joint_names[i] << "," << skeleton_data.skeletons[0].joint_names[i] << "," << skeleton_data.skeletons[0].joint_names[i] << ",";}
 
-        // Second Row: sec, nsec, frame id, seq, x,y,z (x20 joint_names)
-        skeleton_pose_save << "\nsec,nsec, ,";
+        // Second Row: sec, nsec, seq, x,y,z (x20 joint_names)
+        skeleton_pose_save << "\nsec,nsec,seq, ,";
 
         // ... x,y,z (x20 joint_names) ...
         for (unsigned i = 0; i < skeleton_data.skeletons[0].joint_names.size(); i++) {skeleton_pose_save << "x,y,z" << ",";}
@@ -238,7 +247,7 @@ void data_acquisition::skeleton_data_Callback (const nuitrack_msgs::SkeletonData
         skeleton_pose_save << "\n\n";
 
         // Turn Up the Flag
-        skeleton_message_first_row = true;
+        skeleton_pose_first_row = true;
 
     }
 
@@ -248,7 +257,7 @@ void data_acquisition::skeleton_data_Callback (const nuitrack_msgs::SkeletonData
         if (skeleton_data.skeletons[0].joint_names.size() != 20) {ROS_WARN_STREAM("Warning! Skeleton Joint Size = " << skeleton_data.skeletons[0].joint_names.size());}
 
         // Time Stamp
-        skeleton_pose_save << skeleton_data.header.stamp.sec << "," << skeleton_data.header.stamp.nsec << ", ,";
+        skeleton_pose_save << skeleton_data.header.stamp.sec << "," << skeleton_data.header.stamp.nsec << "," << skeleton_data.header.seq << ", ,";
 
         // Data (x,y,z for each joint)
         for (unsigned int i = 0; i < skeleton_data.skeletons[0].joint_names.size(); i++) {
@@ -273,16 +282,19 @@ void data_acquisition::ofstream_creation (std::string ofstream_name) {
     // Get ROS Package Path
     std::string package_path = ros::package::getPath("gesture_recognition_nuitrack");
     std::cout << std::endl;
-    ROS_INFO_STREAM_ONCE("Package Path:  " << package_path);
+    // ROS_INFO_STREAM_ONCE("Package Path:  " << package_path);
 
     std::string image_raw_save_file = package_path + "/dataset/data_acquisition/" + ofstream_name + "_image_raw.csv";
     std::string skeleton_message_save_file = package_path + "/dataset/data_acquisition/" + ofstream_name + "_skeleton_message.csv";
     std::string skeleton_pose_save_file = package_path + "/dataset/data_acquisition/" + ofstream_name + "_skeleton_pose.csv";
 
     // OfStream Creation
-    if (save_image_raw) {image_raw_save = std::ofstream(image_raw_save_file); ROS_WARN_STREAM("Image Raw File:\t\"" << ofstream_name << "_image_raw.csv\"");}
+    if (save_image_raw) {image_raw_save = std::ofstream(image_raw_save_file); ROS_WARN_STREAM("Image Raw File:\t\t\"" << ofstream_name << "_image_raw.csv\"");}
     if (save_skeleton_message) {skeleton_message_save = std::ofstream(skeleton_message_save_file); ROS_WARN_STREAM("Skeleton Message File:\t\"" << ofstream_name << "_skeleton_message.csv\"");}
     if (save_skeleton_pose) {skeleton_pose_save = std::ofstream(skeleton_pose_save_file); ROS_WARN_STREAM("Skeleton Pose File:\t\"" << ofstream_name << "_skeleton_pose.csv\"");}
+
+    // New Line
+    std::cout << "";
 
 }
 
@@ -293,8 +305,9 @@ void data_acquisition::draw_skeleton (nuitrack_msgs::SkeletonData skeleton_data,
     img = cv_bridge::toCvCopy(image, image.encoding);
     cv::Mat img_mat =  img->image;
 
-    ROS_INFO_STREAM_THROTTLE(5,"\nImage Timestamp: " << skeleton_data.header.stamp);
-    ROS_INFO_STREAM_THROTTLE(5,"Skeleton Timestamp: " << image.header.stamp);
+    // Print Timestamp
+    // ROS_INFO_STREAM_THROTTLE(5,"\nImage Timestamp: " << image.header.stamp);
+    // ROS_INFO_STREAM_THROTTLE(5,"Skeleton Timestamp: " << skeleton_data.header.stamp);
 
     // Create Skeleton Markers Vector
     std::vector<Skeleton_Markers> skeleton_markers;
@@ -389,6 +402,30 @@ void data_acquisition::spinner (void) {
     // Draw Skeleton On Image Raw (only if Image and Skeletons already exists)
     if (skeleton_data_received && image_row_received) {draw_skeleton (skeleton, image_raw);}
 
-    if (shutdown_required) {ros::shutdown();}
+    if (shutdown_required) {
+
+        // Wait for the Subscriber Queue to Empty
+        while (!queue_empty) {
+
+            ros::spinOnce();
+
+            // Wait 2 Seconds From Last Message Received (if any queue exist)
+            if ((ros::Time::now() - new_message_time).toSec() > 2) {queue_empty = true;}
+
+        }
+
+        // Stop Registration
+        start_registration = false;
+        
+        // Close OfStreams
+        if (save_image_raw) {image_raw_save.close();}
+        if (save_skeleton_message) {skeleton_message_save.close();}
+        if (save_skeleton_pose) {skeleton_pose_save.close();}
+
+        ROS_WARN("Data Saved Succesfully\n");
+
+        ros::shutdown();
+        
+    }
 
 }
