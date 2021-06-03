@@ -58,6 +58,7 @@ class data_acquisition {
     private:
 
         ros::NodeHandle nh;
+        bool DEBUG;
 
         // ---- Parameters ---- //
         bool save_image_raw, save_skeleton_message, save_skeleton_pose;
@@ -65,12 +66,12 @@ class data_acquisition {
         ros::Time new_message_time;
         std::string save_file_name;
         sensor_msgs::Image image_raw;
-        nuitrack_msgs::SkeletonData skeleton;
+        nuitrack_msgs::SkeletonData skeleton, last_skeleton_data;
 
         // ---- OfStreams ---- //
         std::ofstream image_raw_save, skeleton_message_save, skeleton_pose_save;
         bool image_raw_first_row, skeleton_message_first_row, skeleton_pose_first_row;
-        bool skeleton_data_received, image_row_received;
+        bool skeleton_data_received, image_row_received, firt_skeleton_callback;
         
         // ---- PUBLISHERS & SUBSCRIBERS ---- //
         ros::Subscriber skeleton_data_subscriber, image_raw_subscriber;
@@ -86,10 +87,19 @@ class data_acquisition {
         bool Start_Registration_Service_Callback (gesture_recognition::String::Request &req, gesture_recognition::String::Response &res);
         bool Stop_Registration_Service_Callback (std_srvs::TriggerRequest &req, std_srvs::TriggerResponse &res);
 
-        // ---- FUNCTIONS ---- //
+        // ---- OFSTREAM FUNCTIONS ---- //
         void ofstream_creation (std::string ofstream_name);
-        void draw_skeleton (nuitrack_msgs::SkeletonData skeleton_data, sensor_msgs::Image image);
+        void ofstream_image_raw (sensor_msgs::Image image);
+        void ofstream_skeleton_message (nuitrack_msgs::SkeletonDataArray skeleton_message);
+        void ofstream_skeleton_pose (nuitrack_msgs::SkeletonDataArray skeleton_pose);
+
+        // ---- DRAW SKELETON FUNCTIONS ---- //
+        int draw_skeleton (nuitrack_msgs::SkeletonData skeleton_data, sensor_msgs::Image image, std::string window_name, int wait_key);
         void draw_skeleton_between_two_markers (std::string marker1, std::string marker2, std::vector<Skeleton_Markers> skeleton, cv::Mat *img);
+        
+        // ---- DATA VALIDITY FUNCTIONS ---- //
+        bool check_data_validity (nuitrack_msgs::SkeletonData last_valid_skeleton_data, nuitrack_msgs::SkeletonData new_skeleton_data);
+        bool points_are_close (geometry_msgs::Point first_point, geometry_msgs::Point second_point);
 
 };
 

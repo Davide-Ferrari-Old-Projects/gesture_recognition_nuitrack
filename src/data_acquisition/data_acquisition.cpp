@@ -24,18 +24,22 @@ data_acquisition::data_acquisition() {
     queue_empty = false;
     skeleton_data_received = false;
     image_row_received = false;
+    firt_skeleton_callback = true;
 
     // First Row Bool Initialization
     image_raw_first_row = false;
     skeleton_message_first_row = false;
     skeleton_pose_first_row = false;
     
+    // DEBUG
+    DEBUG = false;
+
 }
 
 data_acquisition::~data_acquisition() {}
 
 
-//------------------------------------------------------ CALLBACK ------------------------------------------------------//
+//------------------------------------------------------ CALLBACK -------------------------------------------------------//
 
 
 bool data_acquisition::Start_Registration_Service_Callback (gesture_recognition::String::Request &req, gesture_recognition::String::Response &res) {
@@ -59,7 +63,8 @@ bool data_acquisition::Stop_Registration_Service_Callback (std_srvs::TriggerRequ
 
     shutdown_required = true;
 
-    ROS_WARN("\nWait For Data Saving...");
+    std::cout << "\n";
+    ROS_WARN("Wait For Data Saving...");
 
     res.success = true;
     return true;
@@ -73,67 +78,13 @@ void data_acquisition::image_raw_Callback (const sensor_msgs::Image::ConstPtr &m
     image_row_received = true;
 
     // Get Message Time
-    new_message_time = ros::Time::now();    
+    new_message_time = ros::Time::now();
 
-    /********************************************************************************************
-     *                                  sensor_msgs::Image                                      *
-     *                                                                                          *
-     *  std_msgs/Header header                                                                  *
-     *      uint32 seq                                                                          *
-     *      time stamp              # timestamp should be acquisition time of image             *
-     *      string frame_id         # frame_id should be optical frame of camera                *
-     *                                                                                          *
-     *  uint32 height               # image height, that is, number of rows                     *
-     *  uint32 width                # image width, that is, number of columns                   *
-     *  string encoding             # Encoding of pixels -- channel meaning, ordering, size     *
-     *  uint8 is_bigendian          # is this data bigendian?                                   *
-     *  uint32 step                 # Full row length in bytes                                  *
-     *  uint8[] data                # actual matrix data, size is (step * rows)                 *
-     *                                                                                          *
-     *******************************************************************************************/
+    // Save Image on .csv
+    if (save_image_raw) {ofstream_image_raw(image_raw);}
 
-    if (!image_raw_first_row &&  save_image_raw) {
-
-        // First, Second Row: Time Stamp, Header, Dimension, Image Parameters, Data ...
-        image_raw_save << "Timestamp,Timestamp,Header,Header, ,Height,Width, ,Encoding,Is Bigendian,Step, ,Data...\n";
-        image_raw_save << "sec,nsec,frame_id,seq \n";
-
-        // Third Row: Empty
-        image_raw_save << "\n";
-
-        // Turn Up the Flag
-        image_raw_first_row = true;
-
-    }
-
-    if (start_registration && save_image_raw) {
-
-        // Time Stamp & Header
-        image_raw_save << image_raw.header.stamp.sec << "," << image_raw.header.stamp.nsec << ",";
-        image_raw_save << image_raw.header.frame_id << "," << image_raw.header.seq << ", ,";
-
-        // Dimension
-        image_raw_save << image_raw.height << "," << image_raw.width << ", ,";
-
-        // Parameters ()
-        image_raw_save << image_raw.encoding << "," << image_raw.is_bigendian << "," << image_raw.step << ", ,";
-
-        // Data (size = row (height) * step)
-        for (unsigned int i = 0; i < image_raw.data.size(); i++) {image_raw_save << int(image_raw.data[i]) << ",";}
-
-        // New Line
-        image_raw_save << "\n";
-
-        // Show Image Raw
-        cv_bridge::CvImagePtr img = cv_bridge::toCvCopy(image_raw, "bgr8");
-        cv::imshow("Image Raw",img->image);
-        cv::waitKey(10);
-
-        ROS_INFO_STREAM_THROTTLE(5, "Saving Image Raw...");
-    
-    }
-    
 }
+
 
 void data_acquisition::skeleton_data_Callback (const nuitrack_msgs::SkeletonDataArray::ConstPtr &msg) {
 
@@ -151,131 +102,54 @@ void data_acquisition::skeleton_data_Callback (const nuitrack_msgs::SkeletonData
         // Header
         skeleton.header = skeleton_data.header;
 
-    }
+    } else {ROS_ERROR("Skeleton Message Missing");}
 
-    /********************************************************************************************
-     *                              nuitrack_msgs::SkeletonDataArray                            *
-     *                                                                                          *
-     *  std_msgs/Header header                                                                  *
-     *      uint32 seq                                                                          *
-     *      time stamp              # timestamp should be acquisition time of image             *
-     *      string frame_id         # frame_id should be optical frame of camera                *
-     *                                                                                          *
-     *  nuitrack_msgs::SkeletonData[] skeletons                                                 *
-     *      uint16 id                           # user id                                       *
-     *      string[] joint_names                     # joint names                                   *
-     *      geometry_msgs/Point[] joint_pos_3D     # joint cartesian positions                     *
-     *                                                                                          *
-     *******************************************************************************************/
-    
-    if (!skeleton_message_first_row && save_skeleton_message) {
+    // Only First Cycle
+    if (firt_skeleton_callback) {last_skeleton_data = skeleton; firt_skeleton_callback = false;}
 
-        // First Row: Time Stamp, Header, User ID, ...
-        skeleton_message_save << "Timestamp,Timestamp,Header,Header, ,user id, ,";
+    if (check_data_validity(last_skeleton_data, skeleton)) {
 
-        // ... Joint Names (x3 each joint), twice (3D and 2D) ...
-        for (unsigned i = 0; i < skeleton_data.skeletons[0].joint_names.size(); i++) {skeleton_message_save << skeleton_data.skeletons[0].joint_names[i] << "," << skeleton_data.skeletons[0].joint_names[i] << "," << skeleton_data.skeletons[0].joint_names[i] << ",";}
-        skeleton_message_save << " ,";
-        for (unsigned i = 0; i < skeleton_data.skeletons[0].joint_names.size(); i++) {skeleton_message_save << skeleton_data.skeletons[0].joint_names[i] << "," << skeleton_data.skeletons[0].joint_names[i] << "," << skeleton_data.skeletons[0].joint_names[i] << ",";}
+        // Assign Current Message to Last Skeleton Data
+        last_skeleton_data = skeleton;
 
-        // Second Row: sec, nsec, frame id, seq, x,y,z (x20 joint_names)
-        skeleton_message_save << "\nsec,nsec,frame_id,seq, , , ,";
+        // Save Skeleton Message on .csv
+        if (save_skeleton_message) {ofstream_skeleton_message(skeleton_data);}
 
-        // ... x,y,z (x20 joint_names), twice (3D and 2D) ...
-        for (unsigned i = 0; i < skeleton_data.skeletons[0].joint_names.size(); i++) {skeleton_message_save << "x - 3D,y - 3D,z - 3D" << ",";}
-        skeleton_message_save << " ,";
-        for (unsigned i = 0; i < skeleton_data.skeletons[0].joint_names.size(); i++) {skeleton_message_save << "x - 2D,y - 2D,z - 2D" << ",";}
+        // Save Skeleton Pose on .csv
+        if (save_skeleton_pose) {ofstream_skeleton_pose(skeleton_data);}
 
-        // Third Row: Empty
-        skeleton_message_save << "\n\n";
+    } else {
 
-        // Turn Up the Flag
-        skeleton_message_first_row = true;
+        // Show The Skeleton and Ask the User if it's Good
+        if (image_row_received) {
 
-    }
+            int keycode = draw_skeleton (skeleton, image_raw, "Data is Valid ? s/n", 0);
 
-    if (start_registration && save_skeleton_message) {
+            // ROS_WARN_STREAM(keycode);
+            int s = 1048691, n = 1048686;
 
-        // Check Skeleton Joint Size (check if all 20 joints  are present)
-        if (skeleton_data.skeletons[0].joint_names.size() != 20) {ROS_WARN_STREAM("Warning! Skeleton Joint Size = " << skeleton_data.skeletons[0].joint_names.size());}
+            // If User Answer 's'
+            if (keycode == s) {
 
-        // Time Stamp & Header
-        skeleton_message_save << skeleton_data.header.stamp.sec << "," << skeleton_data.header.stamp.nsec << ",";
-        skeleton_message_save << skeleton_data.header.frame_id << "," << skeleton_data.header.seq << ", ,";
+                // Assign Current Message to Last Skeleton Data
+                last_skeleton_data = skeleton;
 
-        // User ID
-        skeleton_message_save << skeleton_data.skeletons[0].user_id << ", ,";
+                // Save Skeleton Message on .csv
+                if (save_skeleton_message) {ofstream_skeleton_message(skeleton_data);}
 
-        // Data (3D x,y,z for each joint)
-        for (unsigned int i = 0; i < skeleton_data.skeletons[0].joint_names.size(); i++) {
-            skeleton_message_save << skeleton_data.skeletons[0].joint_pos_3D[i].x << ",";
-            skeleton_message_save << skeleton_data.skeletons[0].joint_pos_3D[i].y << ",";
-            skeleton_message_save << skeleton_data.skeletons[0].joint_pos_3D[i].z << ",";
+                // Save Skeleton Pose on .csv
+                if (save_skeleton_pose) {ofstream_skeleton_pose(skeleton_data);}
+
+            }
+
         }
 
-        skeleton_message_save << " ,";
-
-        for (unsigned int i = 0; i < skeleton_data.skeletons[0].joint_names.size(); i++) {
-            skeleton_message_save << skeleton_data.skeletons[0].joint_pos_2D[i].x << ",";
-            skeleton_message_save << skeleton_data.skeletons[0].joint_pos_2D[i].y << ",";
-            skeleton_message_save << skeleton_data.skeletons[0].joint_pos_2D[i].z << ",";
-        }
-
-        // New Line
-        skeleton_message_save << "\n";
-        
-        ROS_INFO_STREAM_THROTTLE(5, "Saving Skeleton Message...");
-
     }
 
-
-    if (!skeleton_pose_first_row && save_skeleton_pose) {
-
-        // First Row: Time Stamp, Header, User ID, ...
-        skeleton_pose_save << "Timestamp,Timestamp,Header, ,";
-
-        // ... Joint Names (x3 each joint) ...
-        for (unsigned i = 0; i < skeleton_data.skeletons[0].joint_names.size(); i++) {skeleton_pose_save << skeleton_data.skeletons[0].joint_names[i] << "," << skeleton_data.skeletons[0].joint_names[i] << "," << skeleton_data.skeletons[0].joint_names[i] << ",";}
-
-        // Second Row: sec, nsec, seq, x,y,z (x20 joint_names)
-        skeleton_pose_save << "\nsec,nsec,seq, ,";
-
-        // ... x,y,z (x20 joint_names) ...
-        for (unsigned i = 0; i < skeleton_data.skeletons[0].joint_names.size(); i++) {skeleton_pose_save << "x,y,z" << ",";}
-
-        // Third Row: Empty
-        skeleton_pose_save << "\n\n";
-
-        // Turn Up the Flag
-        skeleton_pose_first_row = true;
-
-    }
-
-    if (start_registration && save_skeleton_pose) {
-
-        // Check Skeleton Joint Size (check if all 20 joints  are present)
-        if (skeleton_data.skeletons[0].joint_names.size() != 20) {ROS_WARN_STREAM("Warning! Skeleton Joint Size = " << skeleton_data.skeletons[0].joint_names.size());}
-
-        // Time Stamp
-        skeleton_pose_save << skeleton_data.header.stamp.sec << "," << skeleton_data.header.stamp.nsec << "," << skeleton_data.header.seq << ", ,";
-
-        // Data (x,y,z for each joint)
-        for (unsigned int i = 0; i < skeleton_data.skeletons[0].joint_names.size(); i++) {
-            skeleton_pose_save << skeleton_data.skeletons[0].joint_pos_3D[i].x << ",";
-            skeleton_pose_save << skeleton_data.skeletons[0].joint_pos_3D[i].y << ",";
-            skeleton_pose_save << skeleton_data.skeletons[0].joint_pos_3D[i].z << ",";
-        }
-
-        // New Line
-        skeleton_pose_save << "\n";
-        
-        ROS_INFO_STREAM_THROTTLE(5, "Saving Skeleton Pose...");
-
-    }
 }
 
-//------------------------------------------------------ FUNCTIONS -----------------------------------------------------//
 
+//-------------------------------------------------- OFSTREAM FUNCTION --------------------------------------------------//
 
 void data_acquisition::ofstream_creation (std::string ofstream_name) {
 
@@ -294,11 +168,221 @@ void data_acquisition::ofstream_creation (std::string ofstream_name) {
     if (save_skeleton_pose) {skeleton_pose_save = std::ofstream(skeleton_pose_save_file); ROS_WARN_STREAM("Skeleton Pose File:\t\"" << ofstream_name << "_skeleton_pose.csv\"");}
 
     // New Line
-    std::cout << "";
+    std::cout << "\n";
 
 }
 
-void data_acquisition::draw_skeleton (nuitrack_msgs::SkeletonData skeleton_data, sensor_msgs::Image image) {
+
+void data_acquisition::ofstream_image_raw (sensor_msgs::Image image) {
+
+    /********************************************************************************************
+     *                                  sensor_msgs::Image                                      *
+     *                                                                                          *
+     *  std_msgs/Header header                                                                  *
+     *      uint32 seq                                                                          *
+     *      time stamp              # timestamp should be acquisition time of image             *
+     *      string frame_id         # frame_id should be optical frame of camera                *
+     *                                                                                          *
+     *  uint32 height               # image height, that is, number of rows                     *
+     *  uint32 width                # image width, that is, number of columns                   *
+     *  string encoding             # Encoding of pixels -- channel meaning, ordering, size     *
+     *  uint8 is_bigendian          # is this data bigendian?                                   *
+     *  uint32 step                 # Full row length in bytes                                  *
+     *  uint8[] data                # actual matrix data, size is (step * rows)                 *
+     *                                                                                          *
+     *******************************************************************************************/
+
+    if (!image_raw_first_row) {
+
+        // First, Second Row: Time Stamp, Header, Dimension, Image Parameters, Data ...
+        image_raw_save << "Timestamp,Timestamp,Header,Header, ,Height,Width, ,Encoding,Is Bigendian,Step, ,Data...\n";
+        image_raw_save << "sec,nsec,frame_id,seq \n";
+
+        // Third Row: Empty
+        image_raw_save << "\n";
+
+        // Turn Up the Flag
+        image_raw_first_row = true;
+
+    }
+
+    if (start_registration) {
+
+        // Time Stamp & Header
+        image_raw_save << image.header.stamp.sec << "," << image.header.stamp.nsec << ",";
+        image_raw_save << image.header.frame_id << "," << image.header.seq << ", ,";
+
+        // Dimension
+        image_raw_save << image.height << "," << image.width << ", ,";
+
+        // Parameters ()
+        image_raw_save << image.encoding << "," << image.is_bigendian << "," << image.step << ", ,";
+
+        // Data (size = row (height) * step)
+        for (unsigned int i = 0; i < image.data.size(); i++) {image_raw_save << int(image.data[i]) << ",";}
+
+        // New Line
+        image_raw_save << "\n";
+
+        // Show Image Raw
+        cv_bridge::CvImagePtr img = cv_bridge::toCvCopy(image, "bgr8");
+        cv::imshow("Image Raw",img->image);
+        cv::waitKey(10);
+
+        ROS_INFO_STREAM_THROTTLE(5, "Saving Image Raw...");
+    
+    }
+
+}
+
+
+void data_acquisition::ofstream_skeleton_message (nuitrack_msgs::SkeletonDataArray skeleton_message) {
+
+    /********************************************************************************************
+     *                              nuitrack_msgs::SkeletonDataArray                            *
+     *                                                                                          *
+     *  std_msgs/Header header                                                                  *
+     *      uint32 seq                                                                          *
+     *      time stamp              # timestamp should be acquisition time of image             *
+     *      string frame_id         # frame_id should be optical frame of camera                *
+     *                                                                                          *
+     *  nuitrack_msgs::SkeletonData[] skeletons                                                 *
+     *      uint16 id                           # user id                                       *
+     *      string[] joint_names                # joint names                                   *
+     *      geometry_msgs/Point[] joint_pos_3D  # joint cartesian positions                     *
+     *                                                                                          *
+     *******************************************************************************************/
+    
+    if (!skeleton_message_first_row) {
+
+        // First Row: Time Stamp, Header, User ID, ...
+        skeleton_message_save << "Timestamp,Timestamp,Header,Header, ,user id, ,";
+
+        // ... Joint Names (x3 each joint), twice (3D and 2D) ...
+        for (unsigned i = 0; i < skeleton_message.skeletons[0].joint_names.size(); i++) {skeleton_message_save << skeleton_message.skeletons[0].joint_names[i] << "," << skeleton_message.skeletons[0].joint_names[i] << "," << skeleton_message.skeletons[0].joint_names[i] << ",";}
+        skeleton_message_save << " ,";
+        for (unsigned i = 0; i < skeleton_message.skeletons[0].joint_names.size(); i++) {skeleton_message_save << skeleton_message.skeletons[0].joint_names[i] << "," << skeleton_message.skeletons[0].joint_names[i] << "," << skeleton_message.skeletons[0].joint_names[i] << ",";}
+
+        // Second Row: sec, nsec, frame id, seq, x,y,z (x20 joint_names)
+        skeleton_message_save << "\nsec,nsec,frame_id,seq, , , ,";
+
+        // ... x,y,z (x20 joint_names), twice (3D and 2D) ...
+        for (unsigned i = 0; i < skeleton_message.skeletons[0].joint_names.size(); i++) {skeleton_message_save << "x - 3D,y - 3D,z - 3D" << ",";}
+        skeleton_message_save << " ,";
+        for (unsigned i = 0; i < skeleton_message.skeletons[0].joint_names.size(); i++) {skeleton_message_save << "x - 2D,y - 2D,z - 2D" << ",";}
+
+        // Third Row: Empty
+        skeleton_message_save << "\n\n";
+
+        // Turn Up the Flag
+        skeleton_message_first_row = true;
+
+    }
+
+    if (start_registration) {
+
+        // Check Skeleton Joint Size (check if all 20 joints  are present)
+        if (skeleton_message.skeletons[0].joint_names.size() != 20) {ROS_WARN_STREAM("Warning! Skeleton Joint Size = " << skeleton_message.skeletons[0].joint_names.size());}
+
+        // Time Stamp & Header
+        skeleton_message_save << skeleton_message.header.stamp.sec << "," << skeleton_message.header.stamp.nsec << ",";
+        skeleton_message_save << skeleton_message.header.frame_id << "," << skeleton_message.header.seq << ", ,";
+
+        // User ID
+        skeleton_message_save << skeleton_message.skeletons[0].user_id << ", ,";
+
+        // Data (3D x,y,z for each joint)
+        for (unsigned int i = 0; i < skeleton_message.skeletons[0].joint_names.size(); i++) {
+            skeleton_message_save << skeleton_message.skeletons[0].joint_pos_3D[i].x << ",";
+            skeleton_message_save << skeleton_message.skeletons[0].joint_pos_3D[i].y << ",";
+            skeleton_message_save << skeleton_message.skeletons[0].joint_pos_3D[i].z << ",";
+        }
+
+        skeleton_message_save << " ,";
+
+        for (unsigned int i = 0; i < skeleton_message.skeletons[0].joint_names.size(); i++) {
+            skeleton_message_save << skeleton_message.skeletons[0].joint_pos_2D[i].x << ",";
+            skeleton_message_save << skeleton_message.skeletons[0].joint_pos_2D[i].y << ",";
+            skeleton_message_save << skeleton_message.skeletons[0].joint_pos_2D[i].z << ",";
+        }
+
+        // New Line
+        skeleton_message_save << "\n";
+        
+        ROS_INFO_STREAM_THROTTLE(5, "Saving Skeleton Message...");
+
+    }
+
+}
+
+
+void data_acquisition::ofstream_skeleton_pose (nuitrack_msgs::SkeletonDataArray skeleton_pose) {
+
+    /********************************************************************************************
+     *                              nuitrack_msgs::SkeletonDataArray                            *
+     *                                                                                          *
+     *  std_msgs/Header header                                                                  *
+     *      uint32 seq                                                                          *
+     *      time stamp              # timestamp should be acquisition time of image             *
+     *      string frame_id         # frame_id should be optical frame of camera                *
+     *                                                                                          *
+     *  nuitrack_msgs::SkeletonData[] skeletons                                                 *
+     *      uint16 id                           # user id                                       *
+     *      string[] joint_names                # joint names                                   *
+     *      geometry_msgs/Point[] joint_pos_3D  # joint cartesian positions                     *
+     *                                                                                          *
+     *******************************************************************************************/
+
+    if (!skeleton_pose_first_row) {
+
+        // First Row: Time Stamp, Header, User ID, ...
+        skeleton_pose_save << "Timestamp,Timestamp,Header, ,";
+
+        // ... Joint Names (x3 each joint) ...
+        for (unsigned i = 0; i < skeleton_pose.skeletons[0].joint_names.size(); i++) {skeleton_pose_save << skeleton_pose.skeletons[0].joint_names[i] << "," << skeleton_pose.skeletons[0].joint_names[i] << "," << skeleton_pose.skeletons[0].joint_names[i] << ",";}
+
+        // Second Row: sec, nsec, seq, x,y,z (x20 joint_names)
+        skeleton_pose_save << "\nsec,nsec,seq, ,";
+
+        // ... x,y,z (x20 joint_names) ...
+        for (unsigned i = 0; i < skeleton_pose.skeletons[0].joint_names.size(); i++) {skeleton_pose_save << "x,y,z" << ",";}
+
+        // Third Row: Empty
+        skeleton_pose_save << "\n\n";
+
+        // Turn Up the Flag
+        skeleton_pose_first_row = true;
+
+    }
+
+    if (start_registration) {
+
+        // Check Skeleton Joint Size (check if all 20 joints  are present)
+        if (skeleton_pose.skeletons[0].joint_names.size() != 20) {ROS_WARN_STREAM("Warning! Skeleton Joint Size = " << skeleton_pose.skeletons[0].joint_names.size());}
+
+        // Time Stamp
+        skeleton_pose_save << skeleton_pose.header.stamp.sec << "," << skeleton_pose.header.stamp.nsec << "," << skeleton_pose.header.seq << ", ,";
+
+        // Data (x,y,z for each joint)
+        for (unsigned int i = 0; i < skeleton_pose.skeletons[0].joint_names.size(); i++) {
+            skeleton_pose_save << skeleton_pose.skeletons[0].joint_pos_3D[i].x << ",";
+            skeleton_pose_save << skeleton_pose.skeletons[0].joint_pos_3D[i].y << ",";
+            skeleton_pose_save << skeleton_pose.skeletons[0].joint_pos_3D[i].z << ",";
+        }
+
+        // New Line
+        skeleton_pose_save << "\n";
+        
+        ROS_INFO_STREAM_THROTTLE(5, "Saving Skeleton Pose...");
+
+    }
+
+}
+
+
+//-------------------------------------------------- SKELETON DRAWING ---------------------------------------------------//
+
+int data_acquisition::draw_skeleton (nuitrack_msgs::SkeletonData skeleton_data, sensor_msgs::Image image, std::string window_name = "Skeleton Markers", int wait_key = 10) {
 
     // Create OpenCV Image Matrix
     cv_bridge::CvImagePtr img;
@@ -371,10 +455,13 @@ void data_acquisition::draw_skeleton (nuitrack_msgs::SkeletonData skeleton_data,
     // cv::circle(img_mat, cv::Point(640,480), 10, (255, 0, 0), 10);
 
     // Show Results
-    cv::imshow("Skeleton Markers",img_mat);
-    cv::waitKey(10);
+    cv::imshow(window_name, img_mat);
+    int keycode_pressed = cv::waitKeyEx(wait_key);
+
+    return keycode_pressed;
 
 }
+
 
 void data_acquisition::draw_skeleton_between_two_markers (std::string marker1, std::string marker2, std::vector<Skeleton_Markers> skeleton, cv::Mat *img) {
 
@@ -392,6 +479,42 @@ void data_acquisition::draw_skeleton_between_two_markers (std::string marker1, s
 
 }
 
+
+//-------------------------------------------- CHECK SKELETON DATA FUNCTION ---------------------------------------------//
+
+bool data_acquisition::check_data_validity (nuitrack_msgs::SkeletonData last_valid_skeleton_data, nuitrack_msgs::SkeletonData new_skeleton_data) {
+
+    nuitrack_msgs::SkeletonData last_data = last_valid_skeleton_data;
+    nuitrack_msgs::SkeletonData new_data = new_skeleton_data;
+
+    bool all_points_are_close = true;
+
+    for (unsigned int i = 0; i < last_data.joint_names.size(); i++) {
+
+        // If One Point isn't close to the last valid ones set the flag false
+        if (!points_are_close(last_data.joint_pos_3D[i], new_data.joint_pos_3D[i])) {all_points_are_close = false;}
+
+    }
+
+    if (all_points_are_close) {return true;}
+    else {return false;}
+
+}
+
+
+bool data_acquisition::points_are_close (geometry_msgs::Point first_point, geometry_msgs::Point second_point) {
+
+    // Two Points are Considered Near if the Distance is lower than 30cm
+    const double distance_tolerance = 30;
+
+    double points_distance = sqrt(pow(first_point.x - second_point.x, 2) + pow(first_point.y - second_point.y, 2) + pow(first_point.z - second_point.z, 2));
+
+    if (fabs(points_distance) < distance_tolerance) {return true;}
+    else {return false;}
+    
+}
+
+
 //-------------------------------------------------------- MAIN --------------------------------------------------------//
 
 
@@ -402,6 +525,7 @@ void data_acquisition::spinner (void) {
     // Draw Skeleton On Image Raw (only if Image and Skeletons already exists)
     if (skeleton_data_received && image_row_received) {draw_skeleton (skeleton, image_raw);}
 
+    // Shutdown Required
     if (shutdown_required) {
 
         // Wait for the Subscriber Queue to Empty
@@ -411,6 +535,9 @@ void data_acquisition::spinner (void) {
 
             // Wait 2 Seconds From Last Message Received (if any queue exist)
             if ((ros::Time::now() - new_message_time).toSec() > 2) {queue_empty = true;}
+
+            // Draw Skeleton On Image Raw (only if Image and Skeletons already exists)
+            if (skeleton_data_received && image_row_received) {draw_skeleton (skeleton, image_raw);}
 
         }
 
@@ -426,6 +553,17 @@ void data_acquisition::spinner (void) {
 
         ros::shutdown();
         
+    }
+
+    // DEBUG
+    if (DEBUG) {
+        
+        if (skeleton_data_received && image_row_received) {
+
+        int keycode = draw_skeleton (skeleton, image_raw, "Data is Valid ? s/n", 0);
+        ROS_WARN_STREAM(keycode);
+        
+        }
     }
 
 }
