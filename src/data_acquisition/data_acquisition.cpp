@@ -8,7 +8,8 @@ data_acquisition::data_acquisition() {
     if (!nh.param<bool>("/data_acquisition_Node/save_image_raw", save_image_raw, false)) {ROS_ERROR("Couldn't retrieve the Save Image Raw Parameter value.");}
     if (!nh.param<bool>("/data_acquisition_Node/save_skeleton_message", save_skeleton_message, false)) {ROS_ERROR("Couldn't retrieve the Save Skeleton Message Parameter value.");}
     if (!nh.param<bool>("/data_acquisition_Node/save_skeleton_pose", save_skeleton_pose, true)) {ROS_ERROR("Couldn't retrieve the Save Skeleton Pose Parameter value.");}
-    // if (!nh.param<std::string>("/data_acquisition_Node/save_file_name", save_file_name, "new_save")) {ROS_ERROR("Couldn't retrieve the csv Save File Name.");}
+    if (!nh.param<bool>("/data_acquisition_Node/data_filtering", data_filtering, true)) {ROS_ERROR("Couldn't retrieve the Data Filtering Parameter value.");}
+    if (!nh.param<bool>("/data_acquisition_Node/ignore_leg_markers", ignore_leg_markers, true)) {ROS_ERROR("Couldn't retrieve the Ignore Leg Markers Parameter value.");}
 
     // ---- ROS SUBSCRIBERS ---- //
     image_raw_subscriber = nh.subscribe("/nuitrack/rgb/image_raw", 0, &data_acquisition::image_raw_Callback, this);
@@ -107,7 +108,7 @@ void data_acquisition::skeleton_data_Callback (const nuitrack_msgs::SkeletonData
     // Only First Cycle
     if (firt_skeleton_callback) {last_skeleton_data = skeleton; firt_skeleton_callback = false;}
 
-    if (check_data_validity(last_skeleton_data, skeleton)) {
+    if (!data_filtering || check_data_validity(last_skeleton_data, skeleton)) {
 
         // Assign Current Message to Last Skeleton Data
         last_skeleton_data = skeleton;
@@ -491,13 +492,28 @@ bool data_acquisition::check_data_validity (nuitrack_msgs::SkeletonData last_val
 
     for (unsigned int i = 0; i < last_data.joint_names.size(); i++) {
 
-        // If One Point isn't close to the last valid ones set the flag false
-        if (!points_are_close(last_data.joint_pos_3D[i], new_data.joint_pos_3D[i])) {all_points_are_close = false;}
+        // Ignore Left and Right Legs
+        if (ignore_leg_markers && (last_data.joint_names[i] == RIGHT_HIP || last_data.joint_names[i] == RIGHT_KNEE || last_data.joint_names[i] == RIGHT_ANKLE ||
+                                   last_data.joint_names[i] == LEFT_HIP  || last_data.joint_names[i] == LEFT_KNEE  || last_data.joint_names[i] == LEFT_ANKLE)) {
+
+            // DO NOTHING
+
+        } else {
+            
+            // If One Point isn't close to the last valid ones set the flag false
+            if (!points_are_close(last_data.joint_pos_3D[i], new_data.joint_pos_3D[i])) {
+                
+                all_points_are_close = false;
+                ROS_WARN_STREAM("Joint " << last_data.joint_names[i] << " too far");
+
+            }
+        
+        }
 
     }
 
     if (all_points_are_close) {return true;}
-    else {return false;}
+    else {std::cout << "\n"; return false;}
 
 }
 

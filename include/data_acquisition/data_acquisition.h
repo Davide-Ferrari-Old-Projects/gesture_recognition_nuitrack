@@ -63,6 +63,7 @@ class data_acquisition {
         // ---- Parameters ---- //
         bool save_image_raw, save_skeleton_message, save_skeleton_pose;
         bool start_registration, shutdown_required, queue_empty;
+        bool data_filtering, ignore_leg_markers;
         ros::Time new_message_time;
         std::string save_file_name;
         sensor_msgs::Image image_raw;
