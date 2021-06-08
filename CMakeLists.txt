@@ -16,10 +16,7 @@ find_package(catkin REQUIRED COMPONENTS
   
   OpenCV
   cv_bridge
-  image_transport
 )
-
-find_package(realsense2 REQUIRED)
 
 add_service_files(
    FILES
@@ -38,7 +35,6 @@ catkin_package(
     include
   LIBRARIES 
     #gesture_recognition_nuitrack
-    ${realsense2_LIBRARY}
   CATKIN_DEPENDS
     roscpp
     rospy
@@ -72,5 +68,11 @@ add_executable(data_acquisition_Node
 target_link_libraries(data_acquisition_Node ${catkin_LIBRARIES})
 add_dependencies(data_acquisition_Node ${catkin_EXPORTED_TARGETS} ${${PROJECT_NAME}_EXPORTED_TARGETS})
 
+# Install
 
-##################################################################################################
+install(PROGRAMS 
+
+  src/dataset_creation_node.py
+
+  DESTINATION ${CATKIN_PACKAGE_PYTHON_DESTINATION}
+)

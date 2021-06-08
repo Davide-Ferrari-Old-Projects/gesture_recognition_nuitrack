@@ -1,0 +1,8 @@
+<launch>
+  
+	<!--	Dataset Creation	-->
+  <node pkg="gesture_recognition_nuitrack" type="dataset_creation.py" name="dataset_creation_node" output="screen">
+
+  </node>
+
+</launch>

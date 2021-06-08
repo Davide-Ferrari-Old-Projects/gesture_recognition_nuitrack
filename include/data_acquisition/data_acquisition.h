@@ -5,9 +5,6 @@
 #include <opencv2/opencv.hpp>
 #include <cv_bridge/cv_bridge.h>
 
-#include <librealsense2/rs.hpp> 
-#include <librealsense2/rsutil.h>
-
 #include <ros/ros.h>
 #include <ros/package.h>
 
