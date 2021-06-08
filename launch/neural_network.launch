@@ -1,0 +1,8 @@
+<launch>
+  
+	<!--	Neural Network	-->
+  <node pkg="gesture_recognition_nuitrack" type="neural_network.py" name="neural_network_node" output="screen">
+
+  </node>
+
+</launch>

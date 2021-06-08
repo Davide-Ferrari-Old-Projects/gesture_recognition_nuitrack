@@ -72,7 +72,8 @@ add_dependencies(data_acquisition_Node ${catkin_EXPORTED_TARGETS} ${${PROJECT_NA
 
 install(PROGRAMS 
 
-  src/dataset_creation_node.py
+  src/dataset_creation.py
+  src/neural_network.py
 
   DESTINATION ${CATKIN_PACKAGE_PYTHON_DESTINATION}
 )
