@@ -24,11 +24,11 @@ with open(data_acquisition_path + 'drop_dx_skeleton_pose.csv', mode='r') as csv_
     for row in csv_reader:
         if line_count == 0:
             # print(f'Column names are {", ".join(row)}')
-            first_row = ['Gesture Label'] + row[4:]
+            first_row = ['Gesture Label'] + row[4:-1]
             line_count += 1
         elif line_count == 1:
             # print(f'Column details are {", ".join(row)}')
-            second_row = [' '] + row[4:]
+            second_row = [' '] + row[4:-1]
             line_count += 1
         elif line_count == 2:
             # print(f'Column details are {", ".join(row)}')
@@ -48,7 +48,7 @@ with open(data_acquisition_path + 'drop_dx_skeleton_pose.csv', mode='r') as csv_
             # print('Ignore First 3 Lines')
             line_count += 1
         else:
-            drop_dx_data.append(['Drop DX'] + row[4:])
+            drop_dx_data.append(['Drop DX'] + row[4:-1])
             # print(drop_dx_data)
             # print(f'Data are: {", ".join(row)}')
             line_count += 1
@@ -67,7 +67,7 @@ with open(data_acquisition_path + 'drop_sx_skeleton_pose.csv', mode='r') as csv_
             # print('Ignore First 3 Lines')
             line_count += 1
         else:
-            drop_sx_data.append(['Drop SX'] + row[4:])
+            drop_sx_data.append(['Drop SX'] + row[4:-1])
             # print(drop_sx_data)
             # print(f'Data are: {", ".join(row)}')
             line_count += 1
@@ -86,7 +86,7 @@ with open(data_acquisition_path + 'pointat_dx_skeleton_pose.csv', mode='r') as c
             # print('Ignore First 3 Lines')
             line_count += 1
         else:
-            pointat_dx_data.append(['Point At DX'] + row[4:])
+            pointat_dx_data.append(['Point At DX'] + row[4:-1])
             # print(pointat_dx_data)
             # print(f'Data are: {", ".join(row)}')
             line_count += 1
@@ -105,7 +105,7 @@ with open(data_acquisition_path + 'pointat_sx_skeleton_pose.csv', mode='r') as c
             # print('Ignore First 3 Lines')
             line_count += 1
         else:
-            pointat_sx_data.append(['Point At SX'] + row[4:])
+            pointat_sx_data.append(['Point At SX'] + row[4:-1])
             # print(pointat_sx_data)
             # print(f'Data are: {", ".join(row)}')
             line_count += 1
@@ -124,7 +124,7 @@ with open(data_acquisition_path + 'take_dx_skeleton_pose.csv', mode='r') as csv_
             # print('Ignore First 3 Lines')
             line_count += 1
         else:
-            take_dx_data.append(['Take DX'] + row[4:])
+            take_dx_data.append(['Take DX'] + row[4:-1])
             # print(take_dx_data)
             # print(f'Data are: {", ".join(row)}')
             line_count += 1
@@ -143,14 +143,32 @@ with open(data_acquisition_path + 'take_sx_skeleton_pose.csv', mode='r') as csv_
             # print('Ignore First 3 Lines')
             line_count += 1
         else:
-            take_sx_data.append(['Take SX'] + row[4:])
+            take_sx_data.append(['Take SX'] + row[4:-1])
             # print(take_sx_data)
             # print(f'Data are: {", ".join(row)}')
             line_count += 1
     rospy.loginfo(f'Processed {line_count} lines.\n')
 
-# Write all Data in a Single Dataset .CSV File
-with open(dataset_path + 'dataset.csv', mode='w') as dataset:
+
+# Split Data in Train and Test Datasets
+drop_dx_data_train = drop_dx_data[:int(len(drop_dx_data) * 0.7)]
+drop_dx_data_test  = drop_dx_data[int(len(drop_dx_data) * 0.7):]
+drop_sx_data_train = drop_sx_data[:int(len(drop_sx_data) * 0.7)]
+drop_sx_data_test  = drop_sx_data[int(len(drop_sx_data) * 0.7):]
+
+pointat_dx_data_train = pointat_dx_data[:int(len(pointat_dx_data) * 0.7)]
+pointat_dx_data_test  = pointat_dx_data[int(len(pointat_dx_data) * 0.7):]
+pointat_sx_data_train = pointat_sx_data[:int(len(pointat_sx_data) * 0.7)]
+pointat_sx_data_test  = pointat_sx_data[int(len(pointat_sx_data) * 0.7):]
+
+take_dx_data_train = take_dx_data[:int(len(take_dx_data) * 0.7)]
+take_dx_data_test  = take_dx_data[int(len(take_dx_data) * 0.7):]
+take_sx_data_train = take_sx_data[:int(len(take_sx_data) * 0.7)]
+take_sx_data_test  = take_sx_data[int(len(take_sx_data) * 0.7):]
+
+
+# Write 70% of Data in a Train Dataset .CSV File
+with open(dataset_path + 'train_dataset.csv', mode='w') as dataset:
     writer = csv.writer(dataset, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
     
     # Write Dataset Intestation
@@ -159,13 +177,32 @@ with open(dataset_path + 'dataset.csv', mode='w') as dataset:
     # writer.writerow(third_row)
     
     # Write Dataset Data
-    for element in drop_dx_data: writer.writerow(element)
-    for element in drop_sx_data: writer.writerow(element)
-    for element in pointat_dx_data: writer.writerow(element)
-    for element in pointat_sx_data: writer.writerow(element)
-    for element in take_dx_data: writer.writerow(element)
-    for element in take_sx_data: writer.writerow(element)
+    for element in drop_dx_data_train: writer.writerow(element)
+    for element in drop_sx_data_train: writer.writerow(element)
+    for element in pointat_dx_data_train: writer.writerow(element)
+    for element in pointat_sx_data_train: writer.writerow(element)
+    for element in take_dx_data_train: writer.writerow(element)
+    for element in take_sx_data_train: writer.writerow(element)
 
-    rospy.logwarn_once('Dataset Created\n')
+    rospy.logwarn_once('Train Dataset Created\n')
+
+# Write 30% of Data in a Test Dataset .CSV File
+with open(dataset_path + 'test_dataset.csv', mode='w') as dataset:
+    writer = csv.writer(dataset, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+    
+    # Write Dataset Intestation
+    # writer.writerow(first_row)
+    # writer.writerow(second_row)
+    # writer.writerow(third_row)
+    
+    # Write Dataset Data
+    for element in drop_dx_data_test: writer.writerow(element)
+    for element in drop_sx_data_test: writer.writerow(element)
+    for element in pointat_dx_data_test: writer.writerow(element)
+    for element in pointat_sx_data_test: writer.writerow(element)
+    for element in take_dx_data_test: writer.writerow(element)
+    for element in take_sx_data_test: writer.writerow(element)
+
+    rospy.logwarn_once('Test Dataset Created\n')
 
 rospy.signal_shutdown("Program Ended")
