@@ -1,8 +1,16 @@
 <launch>
   
+  <arg name="train_network" default="false"/>
+  <arg name="show_skeleton" default="true"/>
+
 	<!--	Neural Network	-->
   <node pkg="gesture_recognition_nuitrack" type="neural_network.py" name="neural_network_node" output="screen">
-
+    <param name="train_network" value="$(arg train_network)"/>
   </node>
+
+	<!--	Show Skeleton	-->
+  <group if="$(arg show_skeleton)">
+    <node pkg="gesture_recognition_nuitrack" type="show_skeleton_Node" name="show_skeleton_Node" output="screen"/>
+  </group>
 
 </launch>

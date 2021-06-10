@@ -1,8 +1,10 @@
 <launch>
   
+  <arg name="split_dataset" default="false"/>
+
 	<!--	Dataset Creation	-->
   <node pkg="gesture_recognition_nuitrack" type="dataset_creation.py" name="dataset_creation_node" output="screen">
-
+    <param name="split_dataset" value="$(arg split_dataset)"/>
   </node>
 
 </launch>

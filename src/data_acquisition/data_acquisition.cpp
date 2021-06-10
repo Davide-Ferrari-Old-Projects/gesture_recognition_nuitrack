@@ -25,7 +25,7 @@ data_acquisition::data_acquisition() {
     queue_empty = false;
     skeleton_data_received = false;
     image_row_received = false;
-    firt_skeleton_callback = true;
+    first_skeleton_callback = true;
 
     // First Row Bool Initialization
     image_raw_first_row = false;
@@ -106,7 +106,7 @@ void data_acquisition::skeleton_data_Callback (const nuitrack_msgs::SkeletonData
     } else {ROS_ERROR("Skeleton Message Missing");}
 
     // Only First Cycle
-    if (firt_skeleton_callback) {last_skeleton_data = skeleton; firt_skeleton_callback = false;}
+    if (first_skeleton_callback) {last_skeleton_data = skeleton; first_skeleton_callback = false;}
 
     if (!data_filtering || check_data_validity(last_skeleton_data, skeleton)) {
 

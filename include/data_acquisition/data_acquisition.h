@@ -69,7 +69,7 @@ class data_acquisition {
         // ---- OfStreams ---- //
         std::ofstream image_raw_save, skeleton_message_save, skeleton_pose_save;
         bool image_raw_first_row, skeleton_message_first_row, skeleton_pose_first_row;
-        bool skeleton_data_received, image_row_received, firt_skeleton_callback;
+        bool skeleton_data_received, image_row_received, first_skeleton_callback;
         
         // ---- PUBLISHERS & SUBSCRIBERS ---- //
         ros::Subscriber skeleton_data_subscriber, image_raw_subscriber;
