@@ -1,2 +1,5 @@
 # Ignore Rosbag Files
 rosbag/*
+
+# Ignore .todo File
+doc/gesture recognition.todo

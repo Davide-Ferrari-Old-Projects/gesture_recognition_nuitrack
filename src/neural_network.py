@@ -158,6 +158,75 @@ else:
     print('\n')
     rospy.logwarn('Neural Network Loaded\n')
 
+
+######################################################################################################
+#                                     COMPUTE POINTAT DIRECTION                                      #
+######################################################################################################
+
+from geometry_msgs.msg import Point
+from skspatial.objects import Line
+from skspatial.objects import Points
+
+begin = rospy.Time.now()
+
+def pointat_compute_direction(pointat_dx_sx, skeleton):
+
+    if (pointat_dx_sx == 'Point At DX'):
+
+        SHOULDER = "joint_right_shoulder"
+        ELBOW = "joint_right_elbow"
+        WRIST = "joint_right_wrist"
+        HAND = "joint_right_hand"
+
+    elif (pointat_dx_sx == 'Point At SX'):
+
+        SHOULDER = "joint_left_shoulder"
+        ELBOW = "joint_left_elbow"
+        WRIST = "joint_left_wrist"
+        HAND = "joint_left_hand"
+
+    # Define the Arm Joints
+    shoulder = Point()
+    elbow = Point()
+    wrist = Point()
+    hand = Point()
+    
+    for i in range (0,len(skeleton.joint_names)):
+
+        if skeleton.joint_names[i]   == SHOULDER: shoulder = skeleton.joint_pos_3D[i]
+        elif skeleton.joint_names[i] == ELBOW:    elbow = skeleton.joint_pos_3D[i]
+        elif skeleton.joint_names[i] == WRIST:    wrist = skeleton.joint_pos_3D[i]
+        elif skeleton.joint_names[i] == HAND:     hand = skeleton.joint_pos_3D[i]
+    
+    # DEBUG
+    # rospy.loginfo_throttle(2, pointat_dx_sx + '\t|| Joint Names: ' + SHOULDER + ' | ' + ELBOW + ' | '  + WRIST + ' | '  + HAND)
+    # rospy.loginfo_throttle(2, 'Shoulder' + '\t|| x: ' + '%.8f' % shoulder.x + '\ty: ' + '%.8f' % shoulder.y + '\tz: ' + '%.8f' % shoulder.z)
+    # rospy.loginfo_throttle(2, 'Elbow'    + '\t|| x: ' + '%.8f' % elbow.x    + '\ty: ' + '%.8f' % elbow.y    + '\tz: ' + '%.8f' % elbow.z)
+    # rospy.loginfo_throttle(2, 'Wrist'    + '\t|| x: ' + '%.8f' % wrist.x    + '\ty: ' + '%.8f' % wrist.y    + '\tz: ' + '%.8f' % wrist.z)
+    # rospy.loginfo_throttle(2, 'Hand'     + '\t|| x: ' + '%.8f' % hand.x     + '\ty: ' + '%.8f' % hand.y     + '\tz: ' + '%.8f' % hand.z)
+
+
+    global begin
+
+    # Compute the Direction of the Gesture
+    if ((rospy.Time.now() - begin).to_sec() > 2):
+        
+        # Create Points Vector
+        points = Points([
+            [shoulder.x, shoulder.y, shoulder.z],
+            [elbow.x, elbow.y, elbow.z],
+            [wrist.x, wrist.y, wrist.z],
+            [hand.x, hand.y, hand.z]
+        ])
+        
+        # Compute Line Best Fitting
+        line_fit = Line.best_fit(points)
+        print('Point At Direction || Line Point: ' + str(line_fit.point) + ' || Direction Vector: ' + str(line_fit.direction) + '\n')
+
+        # Reset Begin Time
+        begin = rospy.Time.now()
+        
+
 ######################################################################################################
 #                                             CALLBACKS                                              #
 ######################################################################################################
@@ -190,22 +259,19 @@ def nuitrack_callback (skeleton_message):
     # Print Prevision (TOLERANCE = 0.9)
     if (max(prevision) > 0.9):
 
-        if argmax(prevision,axis = 0) == 0.0:
-            gesture = "Drop DX"
-        elif argmax(prevision,axis = 0) == 1.0:
-            gesture = "Drop SX"
-        elif argmax(prevision,axis = 0) == 2.0:
-            gesture = "Point At DX"
-        elif argmax(prevision,axis = 0) == 3.0:
-            gesture = "Point At SX"
-        elif argmax(prevision,axis = 0) == 4.0:
-            gesture = "Take DX"
-        elif argmax(prevision,axis = 0) == 5.0:
-            gesture = "Take SX"
+        if   argmax(prevision,axis = 0) == 0.0: gesture = "Drop DX"
+        elif argmax(prevision,axis = 0) == 1.0: gesture = "Drop SX"
+        elif argmax(prevision,axis = 0) == 2.0: gesture = "Point At DX"
+        elif argmax(prevision,axis = 0) == 3.0: gesture = "Point At SX"
+        elif argmax(prevision,axis = 0) == 4.0: gesture = "Take DX"
+        elif argmax(prevision,axis = 0) == 5.0: gesture = "Take SX"
 
         rospy.logwarn_throttle(2, 'Prevision: Gesture ' + str(argmax(prevision,axis = 0)) + ' || Name: ' + gesture)
-        rospy.loginfo_throttle(2, prevision)
-        rospy.loginfo_throttle(2, '\n')    
+        rospy.loginfo_throttle(2, str(prevision) + '\n')
+
+        # Compute Point At Direction
+        if   gesture == "Point At DX": pointat_compute_direction("Point At DX", skeleton_message.skeletons[0])
+        elif gesture == "Point At SX": pointat_compute_direction("Point At SX", skeleton_message.skeletons[0])
 
 
 ######################################################################################################
