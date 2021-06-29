@@ -39,7 +39,7 @@ void show_skeleton::skeleton_data_Callback (const nuitrack_msgs::SkeletonDataArr
         // Header
         skeleton.header = skeleton_data.header;
 
-    } else {ROS_ERROR("Skeleton Message Missing");}
+    } else {ROS_ERROR_THROTTLE(5,"Show Skeleton Node: Skeleton Message Missing");}
 
 }
 

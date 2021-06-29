@@ -10,7 +10,7 @@
 
 #include "nuitrack_msgs/SkeletonDataArray.h"
 #include "nuitrack_msgs/SkeletonData.h"
-#include "gesture_recognition/String.h"
+#include "gesture_recognition_nuitrack/String.h"
 #include <sensor_msgs/Image.h>
 
 #include <std_srvs/Trigger.h>
@@ -82,7 +82,7 @@ class data_acquisition {
         void image_raw_Callback (const sensor_msgs::Image::ConstPtr &);
         void skeleton_data_Callback (const nuitrack_msgs::SkeletonDataArray::ConstPtr &);
 
-        bool Start_Registration_Service_Callback (gesture_recognition::String::Request &req, gesture_recognition::String::Response &res);
+        bool Start_Registration_Service_Callback (gesture_recognition_nuitrack::String::Request &req, gesture_recognition_nuitrack::String::Response &res);
         bool Stop_Registration_Service_Callback (std_srvs::TriggerRequest &req, std_srvs::TriggerResponse &res);
 
         // ---- OFSTREAM FUNCTIONS ---- //

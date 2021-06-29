@@ -3,6 +3,8 @@ project(gesture_recognition_nuitrack)
 
 add_compile_options(-std=c++14)
 
+find_package(OpenCV REQUIRED)
+
 find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
@@ -19,6 +21,13 @@ find_package(catkin REQUIRED COMPONENTS
   cv_bridge
 )
 
+add_message_files(
+  FILES
+  gesture_recognized_array.msg
+  gesture_recognized.msg
+  pointat_direction.msg
+)
+
 add_service_files(
    FILES
    String.srv
@@ -27,6 +36,7 @@ add_service_files(
 generate_messages(
   DEPENDENCIES
   std_msgs
+  geometry_msgs
   ${PROJECT_NAME}
 )
 
@@ -89,7 +99,7 @@ install(
   
   PROGRAMS 
     src/dataset_creation.py
-    src/neural_network.py
+    src/gesture_recognition.py
 
   DESTINATION 
     ${CATKIN_PACKAGE_PYTHON_DESTINATION}

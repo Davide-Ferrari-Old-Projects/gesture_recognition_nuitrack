@@ -4,7 +4,7 @@
   <arg name="show_skeleton" default="true"/>
 
 	<!--	Neural Network	-->
-  <node pkg="gesture_recognition_nuitrack" type="neural_network.py" name="neural_network_node" output="screen">
+  <node pkg="gesture_recognition_nuitrack" type="gesture_recognition.py" name="gesture_recognition_node" output="screen">
     <param name="train_network" value="$(arg train_network)"/>
   </node>
 

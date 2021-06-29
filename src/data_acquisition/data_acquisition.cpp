@@ -43,7 +43,7 @@ data_acquisition::~data_acquisition() {}
 //------------------------------------------------------ CALLBACK -------------------------------------------------------//
 
 
-bool data_acquisition::Start_Registration_Service_Callback (gesture_recognition::String::Request &req, gesture_recognition::String::Response &res) {
+bool data_acquisition::Start_Registration_Service_Callback (gesture_recognition_nuitrack::String::Request &req, gesture_recognition_nuitrack::String::Response &res) {
     
     start_registration = true;
     save_file_name = req.message_data;

@@ -1,0 +1,5 @@
+std_msgs/Header header
+string[6] gesture_names
+float64[6] gesture_probability
+float64 no_gesture_probability
+gesture_recognition_nuitrack/pointat_direction pointat_direction
