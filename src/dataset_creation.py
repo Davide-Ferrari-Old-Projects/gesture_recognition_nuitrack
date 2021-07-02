@@ -152,6 +152,25 @@ with open(data_acquisition_path + 'take_sx_skeleton_pose.csv', mode='r') as csv_
             line_count += 1
     rospy.loginfo(f'Processed {line_count} lines.\n')
 
+# No Gesture Data
+no_gesture_data = []
+
+with open(data_acquisition_path + 'no_gesture_skeleton_pose.csv', mode='r') as csv_file:
+    csv_reader = csv.reader(csv_file, delimiter=',',)
+    rospy.logwarn_once('Opening No Gesture data file.')
+    line_count = 0
+    for row in csv_reader:
+        if line_count == 0 or line_count == 1 or line_count == 2:
+            rospy.loginfo_once('Ignore First 3 Lines')
+            # print('Ignore First 3 Lines')
+            line_count += 1
+        else:
+            take_sx_data.append(['No Gesture'] + row[4:-1])
+            # print(take_sx_data)
+            # print(f'Data are: {", ".join(row)}')
+            line_count += 1
+    rospy.loginfo(f'Processed {line_count} lines.\n')
+
 
 if (split_dataset):
 
@@ -171,6 +190,9 @@ if (split_dataset):
     take_sx_data_train = take_sx_data[:int(len(take_sx_data) * 0.7)]
     take_sx_data_test  = take_sx_data[int(len(take_sx_data) * 0.7):]
 
+    no_gesture_data_train = no_gesture_data[:int(len(no_gesture_data) * 0.7)]
+    no_gesture_data_test  = no_gesture_data[int(len(no_gesture_data) * 0.7):]
+
     # Write 70% of Data in a Train Dataset .CSV File
     with open(dataset_path + 'train_dataset.csv', mode='w') as dataset:
         writer = csv.writer(dataset, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
@@ -187,6 +209,7 @@ if (split_dataset):
         for element in pointat_sx_data_train: writer.writerow(element)
         for element in take_dx_data_train: writer.writerow(element)
         for element in take_sx_data_train: writer.writerow(element)
+        for element in no_gesture_data_train: writer.writerow(element)
 
         rospy.logwarn_once('Train Dataset Created\n')
 
@@ -206,6 +229,7 @@ if (split_dataset):
         for element in pointat_sx_data_test: writer.writerow(element)
         for element in take_dx_data_test: writer.writerow(element)
         for element in take_sx_data_test: writer.writerow(element)
+        for element in no_gesture_data_test: writer.writerow(element)
 
         rospy.logwarn_once('Test Dataset Created\n')
 
@@ -227,6 +251,7 @@ else:
         for element in pointat_sx_data: writer.writerow(element)
         for element in take_dx_data: writer.writerow(element)
         for element in take_sx_data: writer.writerow(element)
+        for element in no_gesture_data: writer.writerow(element)
 
         rospy.logwarn_once('Dataset Created\n')
 

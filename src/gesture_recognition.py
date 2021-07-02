@@ -144,6 +144,25 @@ if (train_network):
         print(prevision)
         print('\n')
 
+    # Insert Model Name
+    # neural_network_model_name = input('Insert Model Name: ')
+
+    # Check if Model Already Exist
+    import os
+    from os import path
+    if path.exists(model_path + "neural_network_model.h5"):
+
+        count = 1
+        
+        while True:
+            
+            # Check for the first Free Name
+            if not path.exists(model_path + "OLD Models/" + "neural_network_model.h5_" + str(count) + "_.bak"):
+                # Rename Old Model
+                os.rename(model_path + "neural_network_model.h5", model_path + "OLD Models/" + "neural_network_model.h5_" + str(count) + "_.bak")
+                break
+            else: count+=1
+
     # Save the Model
     gesture_model.save(model_path + 'neural_network_model.h5')
     print('Model Saved')
@@ -230,7 +249,7 @@ def pointat_compute_direction(pointat_dx_sx, skeleton):
 ######################################################################################################
 
 from nuitrack_msgs.msg import SkeletonDataArray
-from gesture_recognition_nuitrack.msg import gesture_recognized_array, gesture_recognized, gesture_probability, pointat_direction
+from gesture_recognition_nuitrack.msg import gesture_recognized_array, gesture_recognized, pointat_direction
 
 # Gesture Vector Publisher
 gesture_publisher = rospy.Publisher('/gesture_recognition/gesture', gesture_recognized, queue_size=1)
@@ -253,7 +272,7 @@ def probability_filter(gesture_vector):
     for i in range (0, len(gesture_vector.gesture_recognized)):
 
         # Sum each No Gesture Probability Values
-        gesture_probability_counter[len(gesture_probability_counter)] += gesture_vector.gesture_recognized[i].no_gesture_probability;
+        gesture_probability_counter[len(gesture_probability_counter)-1] += gesture_vector.gesture_recognized[i].no_gesture_probability;
 
         for j in range (0, len(gesture_vector.gesture_recognized[i].gesture_probability)):
 
@@ -261,7 +280,7 @@ def probability_filter(gesture_vector):
             gesture_probability_counter[j] += gesture_vector.gesture_recognized[i].gesture_probability[j];
         
     # Divide each voice for the number of gestures received and save in Gesture Probability Vector
-    for i in range (0, len(gesture_probability_counter)): gesture_probability_counter = gesture_probability_counter[i] / len(gesture_vector.gesture_recognized)
+    for i in range (0, len(gesture_probability_counter)): gesture_probability_counter[i] = gesture_probability_counter[i] / len(gesture_vector.gesture_recognized)
 
     # Check if No Gesture is the more Probabile Result
     if   gesture_probability_counter.index(max(gesture_probability_counter)) == 0: gesture = "Drop DX"
@@ -274,7 +293,7 @@ def probability_filter(gesture_vector):
 
     # Assign Mean Value to gesture_mean Message
     for i in range (0, len(gesture_mean.gesture_names)): gesture_mean.gesture_probability[i] = gesture_probability_counter[i]
-    gesture_mean.no_gesture_probability = gesture_probability_counter[len(gesture_probability_counter)]
+    gesture_mean.no_gesture_probability = gesture_probability_counter[len(gesture_probability_counter)-1]
 
     # Compute Point At Direction Mean
     if (gesture == 'Point At DX' or gesture == 'Point At SX'):
